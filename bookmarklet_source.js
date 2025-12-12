@@ -190,7 +190,9 @@
         }
       }
     });
-    filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "ai_studio_chat";
+    // Get chat name from h1 element
+    const chatName = document.querySelector("h1")?.textContent?.trim();
+    filename = (chatName || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "ai_studio_chat";
   } else {
     alert("Unsupported chat site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio");
     return;
