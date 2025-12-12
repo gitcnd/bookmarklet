@@ -13,15 +13,28 @@ A browser bookmarklet to save AI chat conversations as Markdown files.
 - **DeepSeek** (deepseek.com)
 - **OpenRouter** (openrouter.ai)
 - **Claude** (claude.ai)
-- **Gemini** (gemini.google.com) ✨ NEW!
+- **Gemini** (gemini.google.com)
+- **Google AI Studio** (aistudio.google.com) ✨ NEW!
 
 ## Installation
 
 1. Create a new bookmark in your browser
 2. Name it: `📗.md` (or any name you prefer)
-3. Copy the code from `01_readme.md` (the long `javascript:...` line)
+3. Copy the code from `bookmarklet_minified.txt` (the long `javascript:...` line)
 4. Paste it as the URL/Location of the bookmark
 5. Save the bookmark to your bookmarks bar
+
+## Want to test it first?
+
+Before creating a bookmark, you can test the bookmarklet directly in Chrome's address bar:
+
+1. Open `bookmarklet_minified.txt`
+2. Copy the text **BUT DO NOT COPY THE FIRST "j" in "javascript"** - i.e. copy `avascript:(()=>{const e=wind...`
+3. In Chrome's address bar, manually type the letter `j`
+4. Paste (Ctrl or Cmd+V) the rest of the code after the `j`
+5. Hit Enter to run it
+
+**Why?** Chrome blocks pasting `javascript:` for security reasons - at least part of it must be typed manually.
 
 ## Usage
 
@@ -74,6 +87,7 @@ This will update `bookmarklet_minified.txt` with the minified code.
 
 - The bookmarklet extracts visible text from the page
 - For Gemini, it automatically removes "Show thinking" prefixes
+- For Google AI Studio, filenames are based on the chat name (from the h1 heading)
 - Filenames are sanitized and limited to 60 characters
 - The export format is compatible with most Markdown viewers
 
