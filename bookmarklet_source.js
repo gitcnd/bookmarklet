@@ -171,8 +171,28 @@
     const activeConv = document.querySelector(".conversation.active, .conversation.selected, .conversation[aria-current=\"page\"]");
     const convTitle = activeConv?.querySelector(".conversation-title")?.textContent?.trim();
     filename = (convTitle || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "gemini_chat";
+  } else if (hostname.includes("aistudio.google.com")) {
+    siteName = "Google AI Studio";
+    const containers = document.querySelectorAll(".chat-turn-container");
+    containers.forEach(container => {
+      const isUser = container.classList.contains("user");
+      const isModel = container.classList.contains("model");
+      if (isUser || isModel) {
+        const header = isUser ? "### User" : "### Assistant";
+        let text = (container.textContent || "").trim();
+        // Remove UI button text and labels
+        text = text.replace(/^(edit|more_vert|User|Model|Thoughts|Expand to view model thoughts|chevron_right|content_copy|thumb_up|thumb_down|flag|share)+\s*/g, "")
+                   .replace(/\s+(edit|more_vert|content_copy|thumb_up|thumb_down|flag|share)\s*$/g, "")
+                   .replace(/Google Search Suggestions.*$/s, "")
+                   .trim();
+        if (text) {
+          conversationMarkdown += `---\n${header}\n\n${text}\n\n`;
+        }
+      }
+    });
+    filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "ai_studio_chat";
   } else {
-    alert("Unsupported chat site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini");
+    alert("Unsupported chat site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio");
     return;
   }
 
