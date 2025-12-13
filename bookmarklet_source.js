@@ -10,39 +10,66 @@
 
   if (hostname.includes("chatgpt.com")) {
     siteName = "ChatGPT";
-    const messages = document.querySelectorAll("div[data-message-author-role]");
-    const messageArray = Array.from(messages);
     
-    for (let i = 0; i < messageArray.length; i++) {
-      const msg = messageArray[i];
-      const role = msg.getAttribute("data-message-author-role");
+    // Check if this is a shared conversation (uses different structure)
+    const sharedUserMessages = document.querySelectorAll(".user-message-bubble-color");
+    const sharedAssistantMessages = document.querySelectorAll("div[data-message-author-role='assistant']");
+    
+    if (sharedUserMessages.length > 0) {
+      // Shared conversation format
+      const userArray = Array.from(sharedUserMessages);
+      const assistantArray = Array.from(sharedAssistantMessages);
       
-      if (role === "user") {
-        // User message - get text from .whitespace-pre-wrap or textContent
-        const preWrap = msg.querySelector(".whitespace-pre-wrap");
-        const userText = preWrap ? (preWrap.innerText || preWrap.textContent || "").trim() : (msg.textContent || "").trim();
-        if (userText) {
-          conversationMarkdown += `---\n### User\n\n${userText}\n\n`;
-        }
-        
-        // Now collect everything until the next user message as the assistant response
-        let assistantText = "";
-        let j = i + 1;
-        while (j < messageArray.length && messageArray[j].getAttribute("data-message-author-role") !== "user") {
-          const assistantMsg = messageArray[j];
-          const text = (assistantMsg.textContent || "").trim();
-          if (text) {
-            assistantText += text + "\n\n";
+      for (let i = 0; i < Math.max(userArray.length, assistantArray.length); i++) {
+        if (i < userArray.length) {
+          const userText = (userArray[i].textContent || "").trim();
+          if (userText) {
+            conversationMarkdown += `---\n### User\n\n${userText}\n\n`;
           }
-          j++;
         }
-        
-        if (assistantText.trim()) {
-          conversationMarkdown += `### Assistant\n\n${assistantText.trim()}\n\n`;
+        if (i < assistantArray.length) {
+          const assistantText = (assistantArray[i].textContent || "").trim();
+          if (assistantText) {
+            conversationMarkdown += `### Assistant\n\n${assistantText}\n\n`;
+          }
         }
+      }
+    } else {
+      // Regular conversation format
+      const messages = document.querySelectorAll("div[data-message-author-role]");
+      const messageArray = Array.from(messages);
+      
+      for (let i = 0; i < messageArray.length; i++) {
+        const msg = messageArray[i];
+        const role = msg.getAttribute("data-message-author-role");
         
-        // Skip ahead past the assistant messages we just processed
-        i = j - 1;
+        if (role === "user") {
+          // User message - get text from .whitespace-pre-wrap or textContent
+          const preWrap = msg.querySelector(".whitespace-pre-wrap");
+          const userText = preWrap ? (preWrap.innerText || preWrap.textContent || "").trim() : (msg.textContent || "").trim();
+          if (userText) {
+            conversationMarkdown += `---\n### User\n\n${userText}\n\n`;
+          }
+          
+          // Now collect everything until the next user message as the assistant response
+          let assistantText = "";
+          let j = i + 1;
+          while (j < messageArray.length && messageArray[j].getAttribute("data-message-author-role") !== "user") {
+            const assistantMsg = messageArray[j];
+            const text = (assistantMsg.textContent || "").trim();
+            if (text) {
+              assistantText += text + "\n\n";
+            }
+            j++;
+          }
+          
+          if (assistantText.trim()) {
+            conversationMarkdown += `### Assistant\n\n${assistantText.trim()}\n\n`;
+          }
+          
+          // Skip ahead past the assistant messages we just processed
+          i = j - 1;
+        }
       }
     }
     filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);

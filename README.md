@@ -86,6 +86,7 @@ This will update `bookmarklet_minified.txt` with the minified code.
 ## Notes
 
 - The bookmarklet extracts visible text from the page
+- For ChatGPT, it works with both regular conversations and shared conversations (chatgpt.com/gg/...)
 - For Gemini, it automatically removes "Show thinking" prefixes
 - For Google AI Studio, filenames are based on the chat name (from the h1 heading)
 - Filenames are sanitized and limited to 60 characters
