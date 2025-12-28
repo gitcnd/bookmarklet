@@ -75,25 +75,67 @@
     filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
   } else if (hostname.includes("perplexity.ai")) {
     siteName = "Perplexity";
-    document.querySelectorAll("h1").forEach(h1 => {
-      const userQuery = h1.textContent.trim();
-      conversationMarkdown += `---\n### User\n\n${userQuery}\n\n`;
-      let answer = "";
-      let parent = h1;
-      for (let i = 0; i < 15 && parent; i++) {
-        parent = parent.parentElement;
-        if (!parent) break;
-        const answerIdx = parent.textContent.indexOf("Answer");
-        if (answerIdx > -1) {
-          const afterAnswer = parent.textContent.substring(answerIdx + 6);
-          const shareIdx = afterAnswer.indexOf("Share");
-          answer = shareIdx > -1 ? afterAnswer.substring(0, shareIdx).trim() : afterAnswer.substring(0, 3000).trim();
-          break;
+    // Perplexity uses virtualized/lazy-loaded DOM, so we fetch data via their REST API
+    // Extract thread ID from URL: /search/{threadId} or similar patterns
+    const pathMatch = window.location.pathname.match(/\/search\/([^/?]+)/);
+    const threadId = pathMatch ? pathMatch[1] : null;
+    if (threadId) {
+      // Use async IIFE to fetch API data - this makes the bookmarklet async
+      (async () => {
+        try {
+          const response = await fetch(`/rest/thread/${threadId}`, { credentials: "include" });
+          if (!response.ok) throw new Error(`API returned ${response.status}`);
+          const data = await response.json();
+          const entries = data.entries || [];
+          entries.forEach(entry => {
+            try {
+              const steps = JSON.parse(entry.text);
+              const userQuery = steps.find(s => s.step_type === "INITIAL_QUERY")?.content?.query;
+              const finalStep = steps.find(s => s.step_type === "FINAL")?.content?.answer;
+              if (userQuery) {
+                conversationMarkdown += `---\n### User\n\n${userQuery}\n\n`;
+              }
+              if (finalStep) {
+                try {
+                  const answerObj = JSON.parse(finalStep);
+                  if (answerObj.answer) {
+                    conversationMarkdown += `### Assistant\n\n${answerObj.answer}\n\n`;
+                  }
+                } catch {
+                  conversationMarkdown += `### Assistant\n\n${finalStep}\n\n`;
+                }
+              }
+            } catch {}
+          });
+          // Generate and trigger download
+          filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+          const fullMarkdown = `[${siteName}](${url})\n\n${conversationMarkdown}`;
+          const blob = new Blob([fullMarkdown], { type: "text/markdown" });
+          const downloadLink = document.createElement("a");
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = `${filename || "chat_export"}.md`;
+          downloadLink.click();
+        } catch (e) {
+          alert(`Failed to fetch Perplexity thread: ${e.message}`);
         }
-      }
-      if (answer) {
-        answer = answer.replace(/^(Sources|Steps|Answer).*?\n/, "").replace(/Sources·.*?Steps/, "").replace(/^\s+/, "").replace(/\n{3,}/g, "\n\n");
-        conversationMarkdown += `### Assistant\n\n${answer}\n\n`;
+      })();
+      return; // Exit early - async handler will complete the download
+    }
+    // Fallback to DOM scraping if API fails or no thread ID found
+    const userQueryElements = document.querySelectorAll('[class*="group/query"]');
+    const answerBlocks = document.querySelectorAll('div[class*="prose dark:prose-invert inline leading-relaxed"]');
+    userQueryElements.forEach((queryEl, idx) => {
+      const userQuery = queryEl.textContent?.trim();
+      if (!userQuery) return;
+      conversationMarkdown += `---\n### User\n\n${userQuery}\n\n`;
+      if (idx < answerBlocks.length) {
+        let answerText = answerBlocks[idx].innerText?.trim() || "";
+        answerText = answerText.replace(/^(Sources|Reviewed \d+ sources?)\s*/gi, "")
+                               .replace(/\n{3,}/g, "\n\n")
+                               .trim();
+        if (answerText) {
+          conversationMarkdown += `### Assistant\n\n${answerText}\n\n`;
+        }
       }
     });
     filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
