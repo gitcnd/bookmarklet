@@ -1,5 +1,5 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com
 
 (() => {
   const hostname = window.location.hostname;
@@ -262,8 +262,80 @@
     // Get chat name from h1 element
     const chatName = document.querySelector("h1")?.textContent?.trim();
     filename = (chatName || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "ai_studio_chat";
+  } else if (hostname.includes("x.com") || hostname.includes("twitter.com")) {
+    siteName = "X";
+    const articles = document.querySelectorAll('article[data-testid="tweet"]');
+    let originalPosterHandle = "";
+    let firstTweetText = "";
+    
+    articles.forEach((article, idx) => {
+      // Extract handle from user link
+      const userNameEl = article.querySelector('[data-testid="User-Name"]');
+      const userLinks = userNameEl ? Array.from(userNameEl.querySelectorAll('a[href^="/"]')) : [];
+      let handle = "";
+      for (const a of userLinks) {
+        const href = a.getAttribute("href");
+        if (href && href.startsWith("/") && !href.includes("/status/") && href.length > 1) {
+          handle = href;
+          break;
+        }
+      }
+      
+      // Get display name
+      const displayName = userNameEl?.querySelector("span span")?.textContent || "";
+      
+      // Get tweet text
+      const tweetTextEl = article.querySelector('[data-testid="tweetText"]');
+      const fullText = tweetTextEl?.innerText || "";
+      
+      // Get timestamp
+      const timestamp = article.querySelector("time")?.getAttribute("datetime") || "";
+      const formattedTime = timestamp ? new Date(timestamp).toLocaleString() : "";
+      
+      // Get images (filter to actual content images, not emoji or avatars)
+      const images = Array.from(article.querySelectorAll("img"))
+        .map(img => img.src)
+        .filter(src => src && src.includes("pbs.twimg.com") && !src.includes("profile_images") && !src.includes("emoji"));
+      
+      // Get link card URL if present
+      const cardLink = article.querySelector('[data-testid="card.wrapper"] a')?.href || "";
+      
+      // Track the original poster (first tweet's author)
+      if (idx === 0) {
+        originalPosterHandle = handle;
+        firstTweetText = fullText.substring(0, 60);
+      }
+      
+      // Determine if this is from the original poster or a reply
+      const isOriginalPosterPost = handle === originalPosterHandle;
+      const authorLabel = isOriginalPosterPost ? `**${displayName}** (${handle})` : `**${displayName}** (${handle}) — Reply`;
+      
+      // Build the markdown for this tweet
+      conversationMarkdown += `---\n### ${authorLabel}\n`;
+      if (formattedTime) {
+        conversationMarkdown += `*${formattedTime}*\n\n`;
+      }
+      conversationMarkdown += `${fullText}\n\n`;
+      
+      // Add images
+      if (images.length > 0) {
+        images.forEach((imgSrc, imgIdx) => {
+          // Use larger image format instead of 'small'
+          const largerSrc = imgSrc.replace("name=small", "name=large");
+          conversationMarkdown += `![Image ${imgIdx + 1}](${largerSrc})\n\n`;
+        });
+      }
+      
+      // Add card link if present
+      if (cardLink) {
+        conversationMarkdown += `🔗 [Link](${cardLink})\n\n`;
+      }
+    });
+    
+    // Generate filename from first tweet text or title
+    filename = (firstTweetText || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "x_thread";
   } else {
-    alert("Unsupported chat site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com");
     return;
   }
 
