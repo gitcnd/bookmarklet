@@ -56,7 +56,9 @@ bookmarklet/
 ✅ DeepSeek (deepseek.com)  
 ✅ OpenRouter (openrouter.ai)  
 ✅ Claude (claude.ai)  
-✅ **Gemini (gemini.google.com)** ← NEW!
+✅ Gemini (gemini.google.com)  
+✅ Google AI Studio (aistudio.google.com)  
+✅ **X / Twitter (x.com)** ← NEW!
 
 ## Version History
 

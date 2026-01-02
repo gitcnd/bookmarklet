@@ -156,7 +156,9 @@ Saved to: bookmarklet_minified.txt
 3. ✅ **DeepSeek** (deepseek.com)
 4. ✅ **OpenRouter** (openrouter.ai)
 5. ✅ **Claude** (claude.ai)
-6. ✅ **Gemini** (gemini.google.com) ← NEW with conversation title extraction!
+6. ✅ **Gemini** (gemini.google.com)
+7. ✅ **Google AI Studio** (aistudio.google.com)
+8. ✅ **X / Twitter** (x.com) ← NEW!
 
 ## Export Format
 

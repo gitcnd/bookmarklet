@@ -14,7 +14,8 @@ A browser bookmarklet to save AI chat conversations as Markdown files.
 - **OpenRouter** (openrouter.ai)
 - **Claude** (claude.ai)
 - **Gemini** (gemini.google.com)
-- **Google AI Studio** (aistudio.google.com) ✨ NEW!
+- **Google AI Studio** (aistudio.google.com)
+- **X / Twitter** (x.com) ✨ NEW!
 
 ## Installation
 

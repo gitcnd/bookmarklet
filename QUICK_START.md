@@ -30,7 +30,8 @@
 | DeepSeek | deepseek.com | ✅ Working |
 | OpenRouter | openrouter.ai | ✅ Working |
 | Claude | claude.ai | ✅ Working |
-| Gemini | gemini.google.com | ✅ **NEW!** |
+| Gemini | gemini.google.com | ✅ Working |
+| X Twitter | x.com | ✅ **NEW!** |
 
 ## Troubleshooting
 

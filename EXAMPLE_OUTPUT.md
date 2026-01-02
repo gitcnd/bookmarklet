@@ -73,7 +73,7 @@ Your question
 Response
 ```
 
-### Gemini Export (NEW!)
+### Gemini Export
 ```markdown
 [Gemini](https://gemini.google.com/app/...)
 
