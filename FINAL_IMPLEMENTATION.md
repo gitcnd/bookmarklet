@@ -149,7 +149,7 @@ Saved to: bookmarklet_minified.txt
 2. Click the `📗.md` bookmark
 3. Markdown file downloads automatically with proper filename
 
-## Supported Platforms (6 total)
+## Supported Platforms (9 total)
 
 1. ✅ **ChatGPT** (chatgpt.com)
 2. ✅ **Perplexity** (perplexity.ai)
@@ -158,7 +158,8 @@ Saved to: bookmarklet_minified.txt
 5. ✅ **Claude** (claude.ai)
 6. ✅ **Gemini** (gemini.google.com)
 7. ✅ **Google AI Studio** (aistudio.google.com)
-8. ✅ **X / Twitter** (x.com) ← NEW!
+8. ✅ **X / Twitter** (x.com)
+9. ✅ **Grok** (grok.com) ← NEW!
 
 ## Export Format
 

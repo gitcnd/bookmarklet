@@ -31,7 +31,9 @@
 | OpenRouter | openrouter.ai | ✅ Working |
 | Claude | claude.ai | ✅ Working |
 | Gemini | gemini.google.com | ✅ Working |
-| X Twitter | x.com | ✅ **NEW!** |
+| Google AI Studio | aistudio.google.com | ✅ Working |
+| X Twitter | x.com | ✅ Working |
+| Grok | grok.com | ✅ **NEW!** |
 
 ## Troubleshooting
 

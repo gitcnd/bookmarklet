@@ -87,6 +87,20 @@ Your question
 Response (with "Show thinking" removed)
 ```
 
+### Grok Export (NEW!)
+```markdown
+[Grok](https://grok.com/c/...)
+
+---
+### User
+
+Your question
+
+### Assistant
+
+Response
+```
+
 All platforms use the same consistent format, making it easy to archive and search through conversations from different AI services.
 
 

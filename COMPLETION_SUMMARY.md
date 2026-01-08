@@ -78,9 +78,10 @@ Successfully added Google Gemini support to the AI chat export bookmarklet witho
 3. DeepSeek (deepseek.com)
 4. OpenRouter (openrouter.ai)
 5. Claude (claude.ai)
-6. **Gemini** (gemini.google.com)
-7. **Google AI Studio** (aistudio.google.com)
-8. **X / Twitter** (x.com) ✨ NEW!
+6. Gemini (gemini.google.com)
+7. Google AI Studio (aistudio.google.com)
+8. X / Twitter (x.com)
+9. **Grok** (grok.com) ✨ NEW!
 
 ## Technical Notes
 

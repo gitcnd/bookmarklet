@@ -1,5 +1,5 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok
 
 (() => {
   const hostname = window.location.hostname;
@@ -334,8 +334,32 @@
     
     // Generate filename from first tweet text or title
     filename = (firstTweetText || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "x_thread";
+  } else if (hostname.includes("grok.com")) {
+    siteName = "Grok";
+    const messageBubbles = document.querySelectorAll(".message-bubble");
+    let firstUserMessage = "";
+    
+    messageBubbles.forEach((bubble, idx) => {
+      const text = bubble.innerText?.trim();
+      if (!text || text.length < 20) return;
+      
+      // Determine if this is a user or assistant message
+      // User messages have bg-surface-l1 class or are in containers with items-end
+      const isUser = bubble.classList.contains("bg-surface-l1") || bubble.closest('[class*="items-end"]');
+      const role = isUser ? "User" : "Assistant";
+      
+      // Capture first user message for filename
+      if (isUser && !firstUserMessage) {
+        firstUserMessage = text.substring(0, 60);
+      }
+      
+      conversationMarkdown += `---\n### ${role}\n\n${text}\n\n`;
+    });
+    
+    // Generate filename from first user message or title
+    filename = (firstUserMessage || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "grok_chat";
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok");
     return;
   }
 

@@ -58,7 +58,8 @@ bookmarklet/
 ✅ Claude (claude.ai)  
 ✅ Gemini (gemini.google.com)  
 ✅ Google AI Studio (aistudio.google.com)  
-✅ **X / Twitter (x.com)** ← NEW!
+✅ X / Twitter (x.com)  
+✅ **Grok (grok.com)** ← NEW!
 
 ## Version History
 
