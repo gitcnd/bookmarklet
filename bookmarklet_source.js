@@ -1,5 +1,5 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, WhatsApp
 
 (() => {
   const hostname = window.location.hostname;
@@ -358,8 +358,171 @@
     
     // Generate filename from first user message or title
     filename = (firstUserMessage || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "grok_chat";
+  } else if (hostname.includes("web.whatsapp.com")) {
+    siteName = "WhatsApp";
+    
+    // WhatsApp uses lazy loading - DOM is a sliding window through time
+    // We scroll to top, then capture messages as we scroll down
+    (async () => {
+      try {
+        const capturedMessages = [];
+        const seenKeys = new Set();
+        
+        // Find the scrollable container that holds messages
+        const findScrollContainer = () => {
+          const allDivs = Array.from(document.querySelectorAll("div")).filter(d => {
+            const style = window.getComputedStyle(d);
+            return style.overflowY === "auto" || style.overflowY === "scroll";
+          });
+          return allDivs.find(d => d.querySelector("[data-pre-plain-text]"));
+        };
+        
+        // Capture all currently visible messages (in DOM order = chronological)
+        const captureCurrentMessages = () => {
+          const messages = document.querySelectorAll("[data-pre-plain-text]");
+          messages.forEach(el => {
+            const timestamp = el.getAttribute("data-pre-plain-text") || "";
+            // Use .copyable-text for actual message content (avoids link preview text)
+            const copyable = el.querySelector(".copyable-text, [class*='copyable-text']");
+            const text = (copyable?.innerText || el.innerText || "").trim();
+            const parent = el.closest('[class*="message-"]');
+            const isOutgoing = parent?.classList.toString().includes("message-out") || false;
+            
+            // Use timestamp + text snippet as unique key
+            const uniqueKey = timestamp + "|||" + text.substring(0, 50);
+            if (!seenKeys.has(uniqueKey)) {
+              seenKeys.add(uniqueKey);
+              capturedMessages.push({ timestamp, text, isOutgoing });
+            }
+          });
+        };
+        
+        // Show toast notification (auto-dismisses)
+        const showToast = (msg, duration) => {
+          const toast = document.createElement("div");
+          toast.textContent = msg;
+          toast.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:8px;z-index:999999;font-family:sans-serif;font-size:14px;";
+          document.body.appendChild(toast);
+          if (duration) setTimeout(() => toast.remove(), duration);
+          return toast;
+        };
+        
+        // Wait for loading to complete (watches scrollHeight changes)
+        const waitForLoad = async (container, maxWait) => {
+          const start = Date.now();
+          let lastHeight = container.scrollHeight;
+          while (Date.now() - start < maxWait) {
+            await new Promise(r => setTimeout(r, 100));
+            if (container.scrollHeight !== lastHeight) {
+              lastHeight = container.scrollHeight;
+            } else if (Date.now() - start > 300) {
+              break; // Stable for 300ms, assume loaded
+            }
+          }
+        };
+        
+        const scrollContainer = findScrollContainer();
+        if (!scrollContainer) {
+          alert("Could not find WhatsApp message container. Make sure a chat is open.");
+          return;
+        }
+        
+        // Get chat name from selected chat in left sidebar
+        const selectedChat = document.querySelector('[aria-selected="true"]');
+        const chatName = selectedChat?.innerText?.split("\n")[0] || "WhatsApp_Chat";
+        
+        const statusToast = showToast("Scrolling to top...");
+        
+        // Phase 1: Scroll to the very top, loading all older messages
+        let lastHeight = 0;
+        let stuckCount = 0;
+        while (stuckCount < 5) {
+          scrollContainer.scrollTop = 0;
+          await waitForLoad(scrollContainer, 2000);
+          
+          if (scrollContainer.scrollHeight === lastHeight) {
+            stuckCount++;
+          } else {
+            lastHeight = scrollContainer.scrollHeight;
+            stuckCount = 0;
+          }
+          
+          // If we're at the top and height stopped changing, we're done
+          if (scrollContainer.scrollTop === 0 && stuckCount >= 2) break;
+        }
+        
+        captureCurrentMessages();
+        
+        // Phase 2: Scroll down capturing messages as we go
+        const scrollStep = 600;
+        const statusUpdateInterval = 50; // Separate variable to avoid %50 URL encoding issue in bookmarklet
+        let scrollIterations = 0;
+        
+        while (scrollIterations < 5000) {
+          const currentScrollTop = scrollContainer.scrollTop;
+          const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+          
+          // Update status periodically
+          if (scrollIterations % statusUpdateInterval === 0) {
+            statusToast.textContent = "Capturing... " + capturedMessages.length + " messages";
+          }
+          
+          // Scroll down
+          scrollContainer.scrollTop = Math.min(currentScrollTop + scrollStep, maxScroll);
+          
+          // Wait for content to load
+          await waitForLoad(scrollContainer, 2000);
+          
+          // Capture newly visible messages
+          captureCurrentMessages();
+          scrollIterations++;
+          
+          // Check if we've reached the bottom
+          if (scrollContainer.scrollTop >= maxScroll - 10) {
+            // Final capture at the bottom
+            await new Promise(r => setTimeout(r, 500));
+            captureCurrentMessages();
+            break;
+          }
+        }
+        
+        statusToast.remove();
+        
+        // Build markdown (messages are already in chronological order from DOM)
+        let markdown = "";
+        capturedMessages.forEach(msg => {
+          // Extract sender name from timestamp format: "[HH:MM, MM/DD/YYYY] Sender Name: "
+          let role = "Other";
+          if (msg.isOutgoing) {
+            role = "You";
+          } else {
+            const match = msg.timestamp.match(/\]\s*([^:]+):/);
+            if (match) {
+              role = match[1].trim();
+            }
+          }
+          
+          markdown += "---\n### " + role + "\n*" + msg.timestamp.trim() + "*\n\n" + msg.text + "\n\n";
+        });
+        
+        const safeFilename = "whatsapp-" + chatName.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+        
+        // Trigger download
+        const fullMarkdown = "[" + siteName + "](" + url + ")\n\n" + markdown;
+        const blob = new Blob([fullMarkdown], { type: "text/markdown" });
+        const downloadLink = document.createElement("a");
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = safeFilename + ".md";
+        downloadLink.click();
+        
+        showToast("Exported " + capturedMessages.length + " messages from " + chatName, 3000);
+      } catch (e) {
+        alert("Error exporting WhatsApp chat: " + e.message);
+      }
+    })();
+    return; // Exit early - async handler will complete the download
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, WhatsApp");
     return;
   }
 

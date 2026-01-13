@@ -81,7 +81,11 @@ Successfully added Google Gemini support to the AI chat export bookmarklet witho
 6. Gemini (gemini.google.com)
 7. Google AI Studio (aistudio.google.com)
 8. X / Twitter (x.com)
-9. **Grok** (grok.com) ✨ NEW!
+9. Grok (grok.com)
+10. **WhatsApp Web** (web.whatsapp.com) ✨ NEW!
+    - Handles lazy-loading by scrolling through entire conversation
+    - Captures messages progressively to avoid DOM cleanup
+    - Extracts sender names and timestamps
 
 ## Technical Notes
 

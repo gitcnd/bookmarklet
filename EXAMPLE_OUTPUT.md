@@ -87,7 +87,7 @@ Your question
 Response (with "Show thinking" removed)
 ```
 
-### Grok Export (NEW!)
+### Grok Export
 ```markdown
 [Grok](https://grok.com/c/...)
 
@@ -100,6 +100,25 @@ Your question
 
 Response
 ```
+
+### WhatsApp Web Export (NEW!)
+```markdown
+[WhatsApp](https://web.whatsapp.com/)
+
+---
+### Chris Drake
+*[10:38, 4/27/2025] Chris Drake:*
+
+Message text here
+
+---
+### You
+*[10:39, 4/27/2025] Chris Drake:*
+
+Your reply here
+```
+
+**Note:** WhatsApp export automatically scrolls through the entire conversation to capture all messages, even in very long chats. This may take a few seconds depending on the chat length.
 
 All platforms use the same consistent format, making it easy to archive and search through conversations from different AI services.
 

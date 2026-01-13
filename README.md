@@ -16,7 +16,11 @@ A browser bookmarklet to save AI chat conversations as Markdown files.
 - **Gemini** (gemini.google.com)
 - **Google AI Studio** (aistudio.google.com)
 - **X / Twitter** (x.com)
-- **Grok** (grok.com) ✨ NEW!
+- **Grok** (grok.com)
+- **WhatsApp Web** (web.whatsapp.com) ✨ NEW!
+  - ⚠️ **Scroll to top manually first**, then scroll down/up to verify
+  - Captures all messages as it scrolls back down
+  - Preserves sender names and timestamps
 
 ## Installation
 

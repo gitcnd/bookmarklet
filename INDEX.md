@@ -59,7 +59,8 @@ bookmarklet/
 ✅ Gemini (gemini.google.com)  
 ✅ Google AI Studio (aistudio.google.com)  
 ✅ X / Twitter (x.com)  
-✅ **Grok (grok.com)** ← NEW!
+✅ Grok (grok.com)  
+✅ **WhatsApp Web (web.whatsapp.com)** ← NEW! (auto-scrolls to capture all)
 
 ## Version History
 
