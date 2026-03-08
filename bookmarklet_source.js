@@ -1,12 +1,17 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, WhatsApp
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp
 
 (() => {
+  const VERSION = "3.1.1";
+  console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
+  
   const hostname = window.location.hostname;
   const url = window.location.href;
   let conversationMarkdown = "";
   let filename = "";
   let siteName = "";
+  
+  console.log(`[Bookmarklet v${VERSION}] Hostname: ${hostname}`);
 
   if (hostname.includes("chatgpt.com")) {
     siteName = "ChatGPT";
@@ -334,30 +339,122 @@
     
     // Generate filename from first tweet text or title
     filename = (firstTweetText || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "x_thread";
-  } else if (hostname.includes("grok.com")) {
+  } else if (hostname.includes("grok.com") || (hostname.includes("x.com") && url.includes("/i/grok"))) {
     siteName = "Grok";
-    const messageBubbles = document.querySelectorAll(".message-bubble");
-    let firstUserMessage = "";
+    console.log(`[Bookmarklet v${VERSION}] Detected Grok interface`);
     
-    messageBubbles.forEach((bubble, idx) => {
-      const text = bubble.innerText?.trim();
-      if (!text || text.length < 20) return;
+    // Check if this is the new x.com/i/grok interface
+    if (hostname.includes("x.com") && url.includes("/i/grok")) {
+      console.log(`[Bookmarklet v${VERSION}] Using X.com Grok extraction`);
       
-      // Determine if this is a user or assistant message
-      // User messages have bg-surface-l1 class or are in containers with items-end
-      const isUser = bubble.classList.contains("bg-surface-l1") || bubble.closest('[class*="items-end"]');
-      const role = isUser ? "User" : "Assistant";
+      // New X.com embedded Grok interface
+      const primaryCol = document.querySelector('[data-testid="primaryColumn"]');
+      console.log(`[Bookmarklet v${VERSION}] primaryColumn found:`, !!primaryCol);
       
-      // Capture first user message for filename
-      if (isUser && !firstUserMessage) {
-        firstUserMessage = text.substring(0, 60);
+      if (primaryCol) {
+        const fullText = primaryCol.innerText;
+        const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        console.log(`[Bookmarklet v${VERSION}] Total lines:`, lines.length);
+        console.log(`[Bookmarklet v${VERSION}] First 5 lines:`, lines.slice(0, 5));
+        
+        // Find where "Thought for" or "Thoughts" appears - this separates user message from Grok response
+        let thoughtIndex = lines.findIndex(l => l.includes('Thought for'));
+        console.log(`[Bookmarklet v${VERSION}] "Thought for" index:`, thoughtIndex);
+        
+        if (thoughtIndex === -1) {
+          thoughtIndex = lines.findIndex(l => l === 'Thoughts');
+          console.log(`[Bookmarklet v${VERSION}] "Thoughts" index:`, thoughtIndex);
+        }
+        
+        if (thoughtIndex > 0) {
+          console.log(`[Bookmarklet v${VERSION}] Found separator at line ${thoughtIndex}`);
+          
+          // Extract user message (everything before "Thought for"/"Thoughts")
+          const userMessage = lines.slice(0, thoughtIndex).filter(l => 
+            !l.includes('See new posts') && 
+            !l.includes('Home') && 
+            !l.includes('Explore') &&
+            l.length > 10
+          ).join('\n');
+          
+          // Extract Grok response (everything from "Thought for"/"Thoughts" onwards)
+          const grokResponse = lines.slice(thoughtIndex).join('\n');
+          
+          console.log(`[Bookmarklet v${VERSION}] User message length:`, userMessage.length);
+          console.log(`[Bookmarklet v${VERSION}] Grok response length:`, grokResponse.length);
+          
+          if (userMessage) {
+            conversationMarkdown += `---\n### User\n\n${userMessage}\n\n`;
+            filename = userMessage.substring(0, 60);
+          }
+          
+          if (grokResponse) {
+            conversationMarkdown += `### Grok\n\n${grokResponse}\n\n`;
+          }
+        } else {
+          console.log(`[Bookmarklet v${VERSION}] ERROR: No separator found (thoughtIndex=${thoughtIndex})`);
+          console.log(`[Bookmarklet v${VERSION}] Lines around potential separator:`, lines.slice(0, 10));
+        }
+      } else {
+        console.log(`[Bookmarklet v${VERSION}] ERROR: primaryColumn not found`);
       }
+    } else {
+      // Old grok.com interface
+      const messageBubbles = document.querySelectorAll(".message-bubble");
+      let firstUserMessage = "";
       
-      conversationMarkdown += `---\n### ${role}\n\n${text}\n\n`;
-    });
+      messageBubbles.forEach((bubble, idx) => {
+        const text = bubble.innerText?.trim();
+        if (!text || text.length < 20) return;
+        
+        // Determine if this is a user or assistant message
+        // User messages have bg-surface-l1 class or are in containers with items-end
+        const isUser = bubble.classList.contains("bg-surface-l1") || bubble.closest('[class*="items-end"]');
+        const role = isUser ? "User" : "Assistant";
+        
+        // Capture first user message for filename
+        if (isUser && !firstUserMessage) {
+          firstUserMessage = text.substring(0, 60);
+        }
+        
+        conversationMarkdown += `---\n### ${role}\n\n${text}\n\n`;
+      });
+      
+      filename = firstUserMessage;
+    }
     
     // Generate filename from first user message or title
-    filename = (firstUserMessage || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "grok_chat";
+    filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "grok_chat";
+  } else if (hostname.includes("copilot.microsoft.com")) {
+    siteName = "Microsoft Copilot";
+    const articles = document.querySelectorAll('div[role="article"]');
+    
+    articles.forEach((article, idx) => {
+      const text = article.innerText?.trim();
+      if (!text || text.length < 10) return;
+      
+      // Determine if this is a user or assistant message based on class
+      const isUser = article.classList.contains("group/user-message");
+      const isAssistant = article.classList.contains("group/ai-message");
+      
+      if (isUser) {
+        // Remove "You said" prefix if present
+        const cleanText = text.replace(/^You said\s*/i, '').trim();
+        conversationMarkdown += `---\n### User\n\n${cleanText}\n\n`;
+        if (idx === 0) {
+          filename = cleanText.substring(0, 60);
+        }
+      } else if (isAssistant) {
+        // Remove "Copilot said" and "See my thinking" prefixes if present
+        const cleanText = text
+          .replace(/^Copilot said\s*/i, '')
+          .replace(/^See my thinking\s*/i, '')
+          .trim();
+        conversationMarkdown += `### Assistant\n\n${cleanText}\n\n`;
+      }
+    });
+    
+    filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "copilot_chat";
   } else if (hostname.includes("web.whatsapp.com")) {
     siteName = "WhatsApp";
     
@@ -522,14 +619,18 @@
     })();
     return; // Exit early - async handler will complete the download
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, WhatsApp");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, WhatsApp");
     return;
   }
 
   if (!conversationMarkdown) {
-    alert("No conversation found to export");
+    console.log(`[Bookmarklet v${VERSION}] ERROR: No conversation content extracted`);
+    console.log(`[Bookmarklet v${VERSION}] Site: ${siteName}, Hostname: ${hostname}`);
+    alert(`No conversation found to export\n\nBookmarklet v${VERSION}\nSite detected: ${siteName || 'Unknown'}\nCheck browser console for details.`);
     return;
   }
+  
+  console.log(`[Bookmarklet v${VERSION}] Successfully extracted ${conversationMarkdown.length} characters`);
 
   const fullMarkdown = `[${siteName}](${url})\n\n${conversationMarkdown}`;
   const blob = new Blob([fullMarkdown], { type: "text/markdown" });
@@ -537,5 +638,7 @@
   downloadLink.href = URL.createObjectURL(blob);
   downloadLink.download = `${filename || "chat_export"}.md`;
   downloadLink.click();
+  
+  console.log(`[Bookmarklet v${VERSION}] Download triggered: ${filename || "chat_export"}.md`);
 })();
 

@@ -59,8 +59,9 @@ bookmarklet/
 ✅ Gemini (gemini.google.com)  
 ✅ Google AI Studio (aistudio.google.com)  
 ✅ X / Twitter (x.com)  
-✅ Grok (grok.com)  
-✅ **WhatsApp Web (web.whatsapp.com)** ← NEW! (auto-scrolls to capture all)
+✅ Grok (grok.com + x.com/i/grok)  
+✅ **Microsoft Copilot (copilot.microsoft.com)** ← NEW!  
+✅ WhatsApp Web (web.whatsapp.com) (auto-scrolls to capture all)
 
 ## Version History
 
