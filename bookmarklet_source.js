@@ -1,8 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
 // Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp
+// Version: 3.2.0
 
 (() => {
-  const VERSION = "3.1.1";
+  const VERSION = "3.2.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -209,14 +210,87 @@
     filename = firstQuery.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "openrouter_chat";
   } else if (hostname.includes("claude.ai")) {
     siteName = "Claude";
-    const messages = document.querySelectorAll("div[data-test-render-count]");
-    messages.forEach(msg => {
-      const header = msg.closest('[class*="font-user"]') ? "### User" : "### Assistant";
-      const text = msg.innerText.trim();
-      if (text) {
-        conversationMarkdown += `---\n${header}\n\n${text}\n\n`;
-      }
-    });
+    // Use Claude's API for reliable extraction including artifacts
+    const claude_chat_id_from_url = window.location.pathname.split("/").pop();
+    if (claude_chat_id_from_url) {
+      (async () => {
+        try {
+          const claude_org_api_response = await fetch("/api/organizations", { credentials: "include" });
+          if (!claude_org_api_response.ok) { throw new Error("Failed to fetch organizations"); }
+          const claude_organizations_list = await claude_org_api_response.json();
+          const claude_active_org_uuid = claude_organizations_list[0]?.uuid;
+          if (!claude_active_org_uuid) { throw new Error("No organization found"); }
+          const claude_conversation_api_response = await fetch(
+            `/api/organizations/${claude_active_org_uuid}/chat_conversations/${claude_chat_id_from_url}?tree=True&rendering_mode=messages&render_all_tools=true`,
+            { credentials: "include" }
+          );
+          if (!claude_conversation_api_response.ok) { throw new Error(`API returned ${claude_conversation_api_response.status}`); }
+          const claude_conversation_data = await claude_conversation_api_response.json();
+          const claude_chat_messages_array = claude_conversation_data.chat_messages || [];
+          claude_chat_messages_array.forEach(claude_single_message => {
+            const claude_message_sender_is_human = claude_single_message.sender === "human";
+            const claude_message_role_header = claude_message_sender_is_human ? "### User" : "### Assistant";
+            const claude_content_blocks_array = claude_single_message.content || [];
+            let claude_assembled_message_text = "";
+            let claude_assembled_artifact_sections = "";
+            claude_content_blocks_array.forEach(claude_content_block => {
+              if (claude_content_block.type === "text" && claude_content_block.text) {
+                const claude_text_without_unsupported_block_markers = claude_content_block.text
+                  .replace(/\n```\nThis block is not supported on your current device yet\.\n```\n/g, "")
+                  .trim();
+                if (claude_text_without_unsupported_block_markers) {
+                  claude_assembled_message_text += claude_text_without_unsupported_block_markers + "\n\n";
+                }
+              } else if (claude_content_block.type === "tool_use" && claude_content_block.input) {
+                if (claude_content_block.name === "create_file" && claude_content_block.input.file_text) {
+                  const claude_artifact_file_name = claude_content_block.input.path
+                    ? claude_content_block.input.path.split("/").pop()
+                    : "artifact";
+                  const claude_artifact_description_text = claude_content_block.input.description || "";
+                  claude_assembled_artifact_sections += `\n---\n#### Artifact: ${claude_artifact_file_name}\n`;
+                  if (claude_artifact_description_text) {
+                    claude_assembled_artifact_sections += `*${claude_artifact_description_text}*\n\n`;
+                  }
+                  claude_assembled_artifact_sections += claude_content_block.input.file_text + "\n\n";
+                }
+              }
+            });
+            const claude_combined_text_with_artifacts = (claude_assembled_message_text + claude_assembled_artifact_sections).trim();
+            if (claude_combined_text_with_artifacts) {
+              conversationMarkdown += `---\n${claude_message_role_header}\n\n${claude_combined_text_with_artifacts}\n\n`;
+            }
+          });
+          filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+          const fullMarkdown = `[${siteName}](${url})\n\n${conversationMarkdown}`;
+          const blob = new Blob([fullMarkdown], { type: "text/markdown" });
+          const downloadLink = document.createElement("a");
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = `${filename || "chat_export"}.md`;
+          downloadLink.click();
+        } catch (claude_api_extraction_error) {
+          console.log(`[Bookmarklet v${VERSION}] Claude API extraction failed: ${claude_api_extraction_error.message}, falling back to DOM`);
+          // DOM fallback: use data-testid to distinguish user vs assistant
+          const claude_dom_message_elements = document.querySelectorAll("div[data-test-render-count]");
+          claude_dom_message_elements.forEach(claude_dom_msg_element => {
+            const claude_dom_msg_contains_user_testid = !!claude_dom_msg_element.querySelector('[data-testid="user-message"]');
+            const claude_dom_role_header = claude_dom_msg_contains_user_testid ? "### User" : "### Assistant";
+            const claude_dom_msg_text = claude_dom_msg_element.innerText.trim();
+            if (claude_dom_msg_text) {
+              conversationMarkdown += `---\n${claude_dom_role_header}\n\n${claude_dom_msg_text}\n\n`;
+            }
+          });
+          filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+          const fullMarkdown = `[${siteName}](${url})\n\n${conversationMarkdown}`;
+          const blob = new Blob([fullMarkdown], { type: "text/markdown" });
+          const downloadLink = document.createElement("a");
+          downloadLink.href = URL.createObjectURL(blob);
+          downloadLink.download = `${filename || "chat_export"}.md`;
+          downloadLink.click();
+        }
+      })();
+      return;
+    }
+    // Fallback for non-chat Claude pages
     filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
   } else if (hostname.includes("gemini.google.com")) {
     siteName = "Gemini";
@@ -267,78 +341,6 @@
     // Get chat name from h1 element
     const chatName = document.querySelector("h1")?.textContent?.trim();
     filename = (chatName || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "ai_studio_chat";
-  } else if (hostname.includes("x.com") || hostname.includes("twitter.com")) {
-    siteName = "X";
-    const articles = document.querySelectorAll('article[data-testid="tweet"]');
-    let originalPosterHandle = "";
-    let firstTweetText = "";
-    
-    articles.forEach((article, idx) => {
-      // Extract handle from user link
-      const userNameEl = article.querySelector('[data-testid="User-Name"]');
-      const userLinks = userNameEl ? Array.from(userNameEl.querySelectorAll('a[href^="/"]')) : [];
-      let handle = "";
-      for (const a of userLinks) {
-        const href = a.getAttribute("href");
-        if (href && href.startsWith("/") && !href.includes("/status/") && href.length > 1) {
-          handle = href;
-          break;
-        }
-      }
-      
-      // Get display name
-      const displayName = userNameEl?.querySelector("span span")?.textContent || "";
-      
-      // Get tweet text
-      const tweetTextEl = article.querySelector('[data-testid="tweetText"]');
-      const fullText = tweetTextEl?.innerText || "";
-      
-      // Get timestamp
-      const timestamp = article.querySelector("time")?.getAttribute("datetime") || "";
-      const formattedTime = timestamp ? new Date(timestamp).toLocaleString() : "";
-      
-      // Get images (filter to actual content images, not emoji or avatars)
-      const images = Array.from(article.querySelectorAll("img"))
-        .map(img => img.src)
-        .filter(src => src && src.includes("pbs.twimg.com") && !src.includes("profile_images") && !src.includes("emoji"));
-      
-      // Get link card URL if present
-      const cardLink = article.querySelector('[data-testid="card.wrapper"] a')?.href || "";
-      
-      // Track the original poster (first tweet's author)
-      if (idx === 0) {
-        originalPosterHandle = handle;
-        firstTweetText = fullText.substring(0, 60);
-      }
-      
-      // Determine if this is from the original poster or a reply
-      const isOriginalPosterPost = handle === originalPosterHandle;
-      const authorLabel = isOriginalPosterPost ? `**${displayName}** (${handle})` : `**${displayName}** (${handle}) — Reply`;
-      
-      // Build the markdown for this tweet
-      conversationMarkdown += `---\n### ${authorLabel}\n`;
-      if (formattedTime) {
-        conversationMarkdown += `*${formattedTime}*\n\n`;
-      }
-      conversationMarkdown += `${fullText}\n\n`;
-      
-      // Add images
-      if (images.length > 0) {
-        images.forEach((imgSrc, imgIdx) => {
-          // Use larger image format instead of 'small'
-          const largerSrc = imgSrc.replace("name=small", "name=large");
-          conversationMarkdown += `![Image ${imgIdx + 1}](${largerSrc})\n\n`;
-        });
-      }
-      
-      // Add card link if present
-      if (cardLink) {
-        conversationMarkdown += `🔗 [Link](${cardLink})\n\n`;
-      }
-    });
-    
-    // Generate filename from first tweet text or title
-    filename = (firstTweetText || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "x_thread";
   } else if (hostname.includes("grok.com") || (hostname.includes("x.com") && url.includes("/i/grok"))) {
     siteName = "Grok";
     console.log(`[Bookmarklet v${VERSION}] Detected Grok interface`);
@@ -425,6 +427,78 @@
     
     // Generate filename from first user message or title
     filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "grok_chat";
+  } else if (hostname.includes("x.com") || hostname.includes("twitter.com")) {
+    siteName = "X";
+    const articles = document.querySelectorAll('article[data-testid="tweet"]');
+    let originalPosterHandle = "";
+    let firstTweetText = "";
+    
+    articles.forEach((article, idx) => {
+      // Extract handle from user link
+      const userNameEl = article.querySelector('[data-testid="User-Name"]');
+      const userLinks = userNameEl ? Array.from(userNameEl.querySelectorAll('a[href^="/"]')) : [];
+      let handle = "";
+      for (const a of userLinks) {
+        const href = a.getAttribute("href");
+        if (href && href.startsWith("/") && !href.includes("/status/") && href.length > 1) {
+          handle = href;
+          break;
+        }
+      }
+      
+      // Get display name
+      const displayName = userNameEl?.querySelector("span span")?.textContent || "";
+      
+      // Get tweet text
+      const tweetTextEl = article.querySelector('[data-testid="tweetText"]');
+      const fullText = tweetTextEl?.innerText || "";
+      
+      // Get timestamp
+      const timestamp = article.querySelector("time")?.getAttribute("datetime") || "";
+      const formattedTime = timestamp ? new Date(timestamp).toLocaleString() : "";
+      
+      // Get images (filter to actual content images, not emoji or avatars)
+      const images = Array.from(article.querySelectorAll("img"))
+        .map(img => img.src)
+        .filter(src => src && src.includes("pbs.twimg.com") && !src.includes("profile_images") && !src.includes("emoji"));
+      
+      // Get link card URL if present
+      const cardLink = article.querySelector('[data-testid="card.wrapper"] a')?.href || "";
+      
+      // Track the original poster (first tweet's author)
+      if (idx === 0) {
+        originalPosterHandle = handle;
+        firstTweetText = fullText.substring(0, 60);
+      }
+      
+      // Determine if this is from the original poster or a reply
+      const isOriginalPosterPost = handle === originalPosterHandle;
+      const authorLabel = isOriginalPosterPost ? `**${displayName}** (${handle})` : `**${displayName}** (${handle}) — Reply`;
+      
+      // Build the markdown for this tweet
+      conversationMarkdown += `---\n### ${authorLabel}\n`;
+      if (formattedTime) {
+        conversationMarkdown += `*${formattedTime}*\n\n`;
+      }
+      conversationMarkdown += `${fullText}\n\n`;
+      
+      // Add images
+      if (images.length > 0) {
+        images.forEach((imgSrc, imgIdx) => {
+          // Use larger image format instead of 'small'
+          const largerSrc = imgSrc.replace("name=small", "name=large");
+          conversationMarkdown += `![Image ${imgIdx + 1}](${largerSrc})\n\n`;
+        });
+      }
+      
+      // Add card link if present
+      if (cardLink) {
+        conversationMarkdown += `🔗 [Link](${cardLink})\n\n`;
+      }
+    });
+    
+    // Generate filename from first tweet text or title
+    filename = (firstTweetText || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "x_thread";
   } else if (hostname.includes("copilot.microsoft.com")) {
     siteName = "Microsoft Copilot";
     const articles = document.querySelectorAll('div[role="article"]');

@@ -33,8 +33,9 @@
 | Gemini | gemini.google.com | ✅ Working |
 | Google AI Studio | aistudio.google.com | ✅ Working |
 | X Twitter | x.com | ✅ Working |
-| Grok | grok.com | ✅ Working |
-| WhatsApp Web | web.whatsapp.com | ✅ **NEW!** Scroll to top first, then run |
+| Grok | grok.com + x.com/i/grok | ✅ Working |
+| Microsoft Copilot | copilot.microsoft.com | ✅ **NEW!** |
+| WhatsApp Web | web.whatsapp.com | ✅ Scroll to top first, then run |
 
 ## Troubleshooting
 
