@@ -16,65 +16,106 @@
 
   if (hostname.includes("chatgpt.com")) {
     siteName = "ChatGPT";
-    
-    // Check if this is a shared conversation (uses different structure)
-    const sharedUserMessages = document.querySelectorAll(".user-message-bubble-color");
-    const sharedAssistantMessages = document.querySelectorAll("div[data-message-author-role='assistant']");
-    
-    if (sharedUserMessages.length > 0) {
-      // Shared conversation format
-      const userArray = Array.from(sharedUserMessages);
-      const assistantArray = Array.from(sharedAssistantMessages);
-      
-      for (let i = 0; i < Math.max(userArray.length, assistantArray.length); i++) {
-        if (i < userArray.length) {
-          const userText = (userArray[i].textContent || "").trim();
-          if (userText) {
-            conversationMarkdown += `---\n### User\n\n${userText}\n\n`;
+
+    let chatgpt_react_tree_extraction_succeeded = false;
+    try {
+      const chatgpt_any_message_element = document.querySelector("[data-message-id]");
+      if (chatgpt_any_message_element) {
+        const chatgpt_react_fiber_key = Object.keys(chatgpt_any_message_element).find(k => k.startsWith("__reactFiber"));
+        if (chatgpt_react_fiber_key) {
+          let chatgpt_fiber_walker = chatgpt_any_message_element[chatgpt_react_fiber_key];
+          let chatgpt_conversation_object = null;
+          for (let chatgpt_depth = 0; chatgpt_depth < 15 && chatgpt_fiber_walker; chatgpt_depth++) {
+            if (chatgpt_fiber_walker.memoizedProps?.conversation) {
+              chatgpt_conversation_object = chatgpt_fiber_walker.memoizedProps.conversation;
+              break;
+            }
+            chatgpt_fiber_walker = chatgpt_fiber_walker.return;
           }
-        }
-        if (i < assistantArray.length) {
-          const assistantText = (assistantArray[i].textContent || "").trim();
-          if (assistantText) {
-            conversationMarkdown += `### Assistant\n\n${assistantText}\n\n`;
+          if (chatgpt_conversation_object) {
+            const chatgpt_symbol_properties = Object.getOwnPropertySymbols(chatgpt_conversation_object);
+            let chatgpt_conversation_tree = null;
+            for (const chatgpt_sym of chatgpt_symbol_properties) {
+              try {
+                const chatgpt_signal_value = chatgpt_conversation_object[chatgpt_sym];
+                const chatgpt_resolved_value = typeof chatgpt_signal_value === "function" ? chatgpt_signal_value() : chatgpt_signal_value;
+                if (chatgpt_resolved_value && typeof chatgpt_resolved_value === "object" && chatgpt_resolved_value.tree && chatgpt_resolved_value.tree.nodes) {
+                  chatgpt_conversation_tree = chatgpt_resolved_value.tree;
+                  break;
+                }
+              } catch (chatgpt_signal_error) {}
+            }
+            if (chatgpt_conversation_tree) {
+              const chatgpt_all_nodes = chatgpt_conversation_tree.nodes;
+              const chatgpt_leaf_id = chatgpt_conversation_tree.currentLeafId;
+              const chatgpt_node_uuid_to_index = {};
+              for (const chatgpt_idx of Object.keys(chatgpt_all_nodes)) {
+                chatgpt_node_uuid_to_index[chatgpt_all_nodes[chatgpt_idx].id] = chatgpt_idx;
+              }
+              const chatgpt_ordered_branch_messages = [];
+              let chatgpt_current_node_index = chatgpt_node_uuid_to_index[chatgpt_leaf_id];
+              let chatgpt_traversal_safety_counter = 0;
+              while (chatgpt_current_node_index !== undefined && chatgpt_traversal_safety_counter < 500) {
+                const chatgpt_current_node = chatgpt_all_nodes[chatgpt_current_node_index];
+                if (!chatgpt_current_node) { break; }
+                const chatgpt_node_message = chatgpt_current_node.message;
+                if (chatgpt_node_message && chatgpt_node_message.author) {
+                  const chatgpt_author_role = chatgpt_node_message.author.role;
+                  const chatgpt_content_type = chatgpt_node_message.content?.content_type;
+                  if ((chatgpt_author_role === "user" || chatgpt_author_role === "assistant") && chatgpt_content_type === "text") {
+                    const chatgpt_content_parts = chatgpt_node_message.content?.parts || [];
+                    const chatgpt_text_only_parts = chatgpt_content_parts.filter(p => typeof p === "string");
+                    const chatgpt_joined_text = chatgpt_text_only_parts.join("\n");
+                    if (chatgpt_joined_text.length > 0) {
+                      chatgpt_ordered_branch_messages.unshift({
+                        role: chatgpt_author_role,
+                        text: chatgpt_joined_text
+                      });
+                    }
+                  }
+                }
+                const chatgpt_parent_uuid = chatgpt_current_node.parentId;
+                chatgpt_current_node_index = chatgpt_parent_uuid ? chatgpt_node_uuid_to_index[chatgpt_parent_uuid] : undefined;
+                chatgpt_traversal_safety_counter++;
+              }
+              if (chatgpt_ordered_branch_messages.length > 0) {
+                chatgpt_react_tree_extraction_succeeded = true;
+                for (const chatgpt_msg of chatgpt_ordered_branch_messages) {
+                  const chatgpt_role_header = chatgpt_msg.role === "user" ? "### User" : "### Assistant";
+                  conversationMarkdown += `---\n${chatgpt_role_header}\n\n${chatgpt_msg.text}\n\n`;
+                }
+                console.log(`[Bookmarklet v${VERSION}] ChatGPT: extracted ${chatgpt_ordered_branch_messages.length} messages from React state tree`);
+              }
+            }
           }
         }
       }
-    } else {
-      // Regular conversation format
-      const messages = document.querySelectorAll("div[data-message-author-role]");
-      const messageArray = Array.from(messages);
-      
-      for (let i = 0; i < messageArray.length; i++) {
-        const msg = messageArray[i];
-        const role = msg.getAttribute("data-message-author-role");
-        
-        if (role === "user") {
-          // User message - get text from .whitespace-pre-wrap or textContent
-          const preWrap = msg.querySelector(".whitespace-pre-wrap");
-          const userText = preWrap ? (preWrap.innerText || preWrap.textContent || "").trim() : (msg.textContent || "").trim();
-          if (userText) {
-            conversationMarkdown += `---\n### User\n\n${userText}\n\n`;
+    } catch (chatgpt_react_extraction_error) {
+      console.log(`[Bookmarklet v${VERSION}] ChatGPT React tree extraction failed: ${chatgpt_react_extraction_error.message}, falling back to DOM`);
+    }
+
+    if (!chatgpt_react_tree_extraction_succeeded) {
+      console.log(`[Bookmarklet v${VERSION}] ChatGPT: falling back to DOM scraping`);
+      const chatgpt_dom_message_elements = document.querySelectorAll("div[data-message-author-role]");
+      const chatgpt_dom_message_array = Array.from(chatgpt_dom_message_elements);
+
+      for (let i = 0; i < chatgpt_dom_message_array.length; i++) {
+        const chatgpt_dom_current_message = chatgpt_dom_message_array[i];
+        const chatgpt_dom_current_role = chatgpt_dom_current_message.getAttribute("data-message-author-role");
+
+        if (chatgpt_dom_current_role === "user") {
+          const chatgpt_dom_pre_wrap_element = chatgpt_dom_current_message.querySelector(".whitespace-pre-wrap");
+          const chatgpt_dom_user_text = chatgpt_dom_pre_wrap_element
+            ? (chatgpt_dom_pre_wrap_element.innerText || chatgpt_dom_pre_wrap_element.textContent || "").trim()
+            : (chatgpt_dom_current_message.textContent || "").trim();
+          if (chatgpt_dom_user_text) {
+            conversationMarkdown += `---\n### User\n\n${chatgpt_dom_user_text}\n\n`;
           }
-          
-          // Now collect everything until the next user message as the assistant response
-          let assistantText = "";
-          let j = i + 1;
-          while (j < messageArray.length && messageArray[j].getAttribute("data-message-author-role") !== "user") {
-            const assistantMsg = messageArray[j];
-            const text = (assistantMsg.textContent || "").trim();
-            if (text) {
-              assistantText += text + "\n\n";
-            }
-            j++;
+        } else if (chatgpt_dom_current_role === "assistant") {
+          const chatgpt_dom_assistant_text = (chatgpt_dom_current_message.textContent || "").trim();
+          if (chatgpt_dom_assistant_text) {
+            conversationMarkdown += `### Assistant\n\n${chatgpt_dom_assistant_text}\n\n`;
           }
-          
-          if (assistantText.trim()) {
-            conversationMarkdown += `### Assistant\n\n${assistantText.trim()}\n\n`;
-          }
-          
-          // Skip ahead past the assistant messages we just processed
-          i = j - 1;
         }
       }
     }
