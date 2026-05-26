@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
 // Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp
-// Version: 3.2.0
+// Version: 3.2.1
 
 (() => {
-  const VERSION = "3.2.0";
+  const VERSION = "3.2.1";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -259,14 +259,19 @@
           const claude_org_api_response = await fetch("/api/organizations", { credentials: "include" });
           if (!claude_org_api_response.ok) { throw new Error("Failed to fetch organizations"); }
           const claude_organizations_list = await claude_org_api_response.json();
-          const claude_active_org_uuid = claude_organizations_list[0]?.uuid;
-          if (!claude_active_org_uuid) { throw new Error("No organization found"); }
-          const claude_conversation_api_response = await fetch(
-            `/api/organizations/${claude_active_org_uuid}/chat_conversations/${claude_chat_id_from_url}?tree=True&rendering_mode=messages&render_all_tools=true`,
-            { credentials: "include" }
-          );
-          if (!claude_conversation_api_response.ok) { throw new Error(`API returned ${claude_conversation_api_response.status}`); }
-          const claude_conversation_data = await claude_conversation_api_response.json();
+          if (!claude_organizations_list.length) { throw new Error("No organizations found"); }
+          let claude_conversation_data = null;
+          for (const claude_candidate_org of claude_organizations_list) {
+            const claude_candidate_org_response = await fetch(
+              `/api/organizations/${claude_candidate_org.uuid}/chat_conversations/${claude_chat_id_from_url}?tree=True&rendering_mode=messages&render_all_tools=true`,
+              { credentials: "include" }
+            );
+            if (claude_candidate_org_response.ok) {
+              claude_conversation_data = await claude_candidate_org_response.json();
+              break;
+            }
+          }
+          if (!claude_conversation_data) { throw new Error("Chat not found in any organization"); }
           const claude_chat_messages_array = claude_conversation_data.chat_messages || [];
           claude_chat_messages_array.forEach(claude_single_message => {
             const claude_message_sender_is_human = claude_single_message.sender === "human";
