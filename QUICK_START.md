@@ -34,8 +34,9 @@
 | Google AI Studio | aistudio.google.com | ✅ Working |
 | X Twitter | x.com | ✅ Working |
 | Grok | grok.com + x.com/i/grok | ✅ Working |
-| Microsoft Copilot | copilot.microsoft.com | ✅ **NEW!** |
+| Microsoft Copilot | copilot.microsoft.com | ✅ Working |
 | WhatsApp Web | web.whatsapp.com | ✅ Scroll to top first, then run |
+| Z.ai | chat.z.ai | ✅ **NEW!** |
 
 ## Troubleshooting
 

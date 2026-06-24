@@ -17,7 +17,8 @@ A browser bookmarklet to save AI chat conversations as Markdown files.
 - **Google AI Studio** (aistudio.google.com)
 - **X / Twitter** (x.com)
 - **Grok** (grok.com + x.com/i/grok)
-- **Microsoft Copilot** (copilot.microsoft.com) ✨ NEW!
+- **Microsoft Copilot** (copilot.microsoft.com)
+- **Z.ai** (chat.z.ai, GLM models) ✨ NEW!
 - **WhatsApp Web** (web.whatsapp.com)
   - ⚠️ **Scroll to top manually first**, then scroll down/up to verify
   - Captures all messages as it scrolls back down
@@ -79,6 +80,7 @@ The AI's response here
 - `create_bookmarklet.js` - Script to minify the bookmarklet
 - `bookmarklet_minified.txt` - Minified bookmarklet code
 - `01_readme.md` - User-facing file with the bookmarklet
+- `Makefile` - Rebuilds (via `create_bookmarklet.js`) and syncs the files to the public repo: `make`
 
 ### Building
 
@@ -88,7 +90,7 @@ To rebuild the bookmarklet after making changes:
 node create_bookmarklet.js
 ```
 
-This will update `bookmarklet_minified.txt` with the minified code.
+This will update `bookmarklet_minified.txt` with the minified code. It also aborts if the output contains a `%` immediately followed by two hex digits, which Chrome would URL-decode and corrupt -- see `01_readme.md` for the details.
 
 ## Notes
 

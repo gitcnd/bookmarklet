@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp
-// Version: 3.2.1
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai
+// Version: 3.3.0
 
 (() => {
-  const VERSION = "3.2.1";
+  const VERSION = "3.3.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -575,6 +575,28 @@
     });
     
     filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "copilot_chat";
+  } else if (hostname === "z.ai" || hostname.endsWith(".z.ai")) {
+    siteName = "Z.ai";
+    // Z.ai runs an Open WebUI-based frontend: user turns carry class "chat-user" and
+    // assistant turns carry "chat-assistant", already interleaved in document order.
+    const zai_message_content_elements_in_document_order = document.querySelectorAll(".chat-user, .chat-assistant");
+    zai_message_content_elements_in_document_order.forEach(zai_single_message_element => {
+      const zai_single_message_is_from_user = zai_single_message_element.classList.contains("chat-user");
+      const zai_role_header = zai_single_message_is_from_user ? "### User" : "### Assistant";
+      let zai_message_visible_text = zai_single_message_element.innerText || "";
+      // Assistant turns are prefixed by a collapsible "Thought Process" reasoning block; strip it so only the answer is exported.
+      const zai_thinking_chain_block = zai_single_message_element.querySelector(".thinking-chain-container");
+      if (zai_thinking_chain_block) {
+        const zai_thinking_chain_text = zai_thinking_chain_block.innerText || "";
+        if (zai_thinking_chain_text && zai_message_visible_text.indexOf(zai_thinking_chain_text) === 0) {
+          zai_message_visible_text = zai_message_visible_text.slice(zai_thinking_chain_text.length);
+        }
+      }
+      zai_message_visible_text = zai_message_visible_text.trim();
+      if (zai_message_visible_text) { conversationMarkdown += `---\n${zai_role_header}\n\n${zai_message_visible_text}\n\n`; }
+      if (zai_single_message_is_from_user && !filename) { filename = zai_message_visible_text.substring(0, 60); }
+    });
+    filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "zai_chat";
   } else if (hostname.includes("web.whatsapp.com")) {
     siteName = "WhatsApp";
     
@@ -739,7 +761,7 @@
     })();
     return; // Exit early - async handler will complete the download
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, WhatsApp");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai");
     return;
   }
 

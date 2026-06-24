@@ -60,7 +60,8 @@ bookmarklet/
 ✅ Google AI Studio (aistudio.google.com)  
 ✅ X / Twitter (x.com)  
 ✅ Grok (grok.com + x.com/i/grok)  
-✅ **Microsoft Copilot (copilot.microsoft.com)** ← NEW!  
+✅ Microsoft Copilot (copilot.microsoft.com)  
+✅ **Z.ai (chat.z.ai)** ← NEW!    
 ✅ WhatsApp Web (web.whatsapp.com) (auto-scrolls to capture all)
 
 ## Version History

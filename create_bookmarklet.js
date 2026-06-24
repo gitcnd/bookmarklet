@@ -30,7 +30,16 @@ terser.minify(code, {
   
   // Wrap in javascript: prefix for bookmarklet
   const bookmarklet = `javascript:${result.code}`;
-  
+
+  // Guard the Chrome percent-decoding trap (see 01_readme.md): bookmarklets are
+  // javascript: URLs, so a "%" immediately followed by two hex digits (e.g. a minified
+  // "i%50" modulo) gets URL-decoded and corrupts the code. Refuse to emit a broken file.
+  const percentEncodingHazards = bookmarklet.match(/%[0-9A-Fa-f]{2}/g);
+  if (percentEncodingHazards) {
+    console.error('Percent-encoding hazard(s) Chrome would decode:', percentEncodingHazards);
+    process.exit(1);
+  }
+
   fs.writeFileSync('bookmarklet_minified.txt', bookmarklet);
   console.log('Bookmarklet created successfully!');
   console.log('Length:', bookmarklet.length);
