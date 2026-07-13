@@ -1,6 +1,9 @@
 # bookmarklet
 
-A one-liner you can put in your chrome quick-access toolbar which saves you AI chat session to a markdown file with 1 click.
+Two one-liners you can put in your chrome quick-access toolbar:
+
+- **📗.md** - saves your AI chat session to a markdown file with 1 click (this section)
+- **🧹nags** - deactivates popups, dimming overlays, and scroll-blocking on nagging websites with 1 click (see [Nag Neutralizer](#nag-neutralizer-bookmarklet-) below, or [NAG_NEUTRALIZER_README.md](NAG_NEUTRALIZER_README.md))
 
 # AI Chat Export Bookmarklet 📗.md
 
@@ -100,6 +103,50 @@ This will update `bookmarklet_minified.txt` with the minified code. It also abor
 - For Google AI Studio, filenames are based on the chat name (from the h1 heading)
 - Filenames are sanitized and limited to 60 characters
 - The export format is compatible with most Markdown viewers
+
+# Nag Neutralizer Bookmarklet 🧹
+
+One click deactivates the junk some sites put between you and their content:
+
+- full-viewport modal popups (adblock walls, subscribe boxes, cookie sheets)
+- the dimming backdrop layers behind them
+- transparent full-screen "click catcher" layers
+- scroll locking (`overflow:hidden` or `position:fixed` tricks on html/body)
+- paywall-style blur over article text, text-selection blocking, and `inert` interaction traps
+
+Key design point: overlays are deactivated **in place** (hidden with `!important`
+inline styles) rather than removed, because many sites watch for their nag being
+deleted and re-insert it. It then keeps watch for 30 seconds and re-asserts
+itself if the page fights back. Clicking it again on stubborn pages is safe --
+it re-scans without stacking duplicate watchers. Like the exporter, it is a
+multifunction button: a generic engine handles most sites, and a per-hostname
+dispatch table handles sites needing bespoke extra steps.
+
+## Installation
+
+1. Create a new bookmark in your browser
+2. Name it: `🧹nags` (or any name you prefer)
+3. Copy the code from `nag_neutralizer_bookmarklet_minified.txt` (the long `javascript:...` line)
+4. Paste it as the URL/Location of the bookmark
+5. Save the bookmark to your bookmarks bar
+
+The same "test it first in the address bar" trick from the exporter above works
+for this one too (type the `j`, paste the rest).
+
+## Usage
+
+1. When a page nags you (popup + dimmed page + no scrolling), click `🧹nags`
+2. A small toast bottom-right reports what was deactivated
+3. If a site re-nags later than 30 seconds after your click, click again
+
+Full details -- what counts as a nag, the fight-back/stand-down design, the
+per-site dispatch table, files, build instructions, and limitations -- are in
+[NAG_NEUTRALIZER_README.md](NAG_NEUTRALIZER_README.md).
+
+Its files: `nag_neutralizer_bookmarklet_source.js` (readable source),
+`create_nag_neutralizer_bookmarklet.js` (build script),
+`nag_neutralizer_bookmarklet_minified.txt` (the toolbar one-liner). Rebuild
+after changes with `node create_nag_neutralizer_bookmarklet.js`.
 
 ## License
 
