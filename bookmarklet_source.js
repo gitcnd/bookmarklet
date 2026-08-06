@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai
-// Version: 3.3.0
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai, Qwen
+// Version: 3.4.0
 
 (() => {
-  const VERSION = "3.3.0";
+  const VERSION = "3.4.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -597,6 +597,36 @@
       if (zai_single_message_is_from_user && !filename) { filename = zai_message_visible_text.substring(0, 60); }
     });
     filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "zai_chat";
+  } else if (hostname.includes("qwencloud.com")) {
+    siteName = "Qwen";
+    const qwen_chat_bubble_elements_in_document_order = document.querySelectorAll('.ant-bubble[data-role]');
+    qwen_chat_bubble_elements_in_document_order.forEach(qwen_single_bubble_element => {
+      const qwen_bubble_role_attribute = qwen_single_bubble_element.getAttribute('data-role');
+      const qwen_bubble_content_wrapper = qwen_single_bubble_element.querySelector('.ant-bubble-content');
+      if (!qwen_bubble_content_wrapper) { return; }
+      // Strip deep-thinking accordion blocks if present (reasoning chain, not final answer)
+      const qwen_deep_thinking_accordion_block = qwen_bubble_content_wrapper.querySelector('.ant-accordion-deep-thinking');
+      let qwen_message_visible_text = "";
+      if (qwen_deep_thinking_accordion_block) {
+        const qwen_thinking_block_text = qwen_deep_thinking_accordion_block.innerText || "";
+        const qwen_full_content_text = qwen_bubble_content_wrapper.innerText || "";
+        if (qwen_thinking_block_text && qwen_full_content_text.indexOf(qwen_thinking_block_text) === 0) {
+          qwen_message_visible_text = qwen_full_content_text.slice(qwen_thinking_block_text.length);
+        } else {
+          qwen_message_visible_text = qwen_full_content_text;
+        }
+      } else {
+        qwen_message_visible_text = qwen_bubble_content_wrapper.innerText || "";
+      }
+      qwen_message_visible_text = qwen_message_visible_text.trim();
+      if (!qwen_message_visible_text) { return; }
+      const qwen_role_header = qwen_bubble_role_attribute === "user" ? "### User" : "### Assistant";
+      conversationMarkdown += `---\n${qwen_role_header}\n\n${qwen_message_visible_text}\n\n`;
+      if (qwen_bubble_role_attribute === "user" && !filename) {
+        filename = qwen_message_visible_text.substring(0, 60);
+      }
+    });
+    filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "qwen_chat";
   } else if (hostname.includes("web.whatsapp.com")) {
     siteName = "WhatsApp";
     
@@ -761,7 +791,7 @@
     })();
     return; // Exit early - async handler will complete the download
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai, Qwen");
     return;
   }
 
