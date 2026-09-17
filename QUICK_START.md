@@ -35,8 +35,11 @@
 | X Twitter | x.com | ✅ Working |
 | Grok | grok.com + x.com/i/grok | ✅ Working |
 | Microsoft Copilot | copilot.microsoft.com | ✅ Working |
+| Microsoft 365 Copilot | m365.cloud.microsoft | ✅ Working |
+| Microsoft Teams | teams.cloud.microsoft | ✅ Meeting transcripts |
 | WhatsApp Web | web.whatsapp.com | ✅ Scroll to top first, then run |
-| Z.ai | chat.z.ai | ✅ **NEW!** |
+| Z.ai | chat.z.ai | ✅ Working |
+| Qwen | qwencloud.com | ✅ Working |
 
 ## Troubleshooting
 

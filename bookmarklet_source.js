@@ -1,5 +1,5 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams
 // Version: 3.7.0
 
 (() => {

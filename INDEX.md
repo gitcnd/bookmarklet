@@ -61,7 +61,10 @@ bookmarklet/
 ✅ X / Twitter (x.com)  
 ✅ Grok (grok.com + x.com/i/grok)  
 ✅ Microsoft Copilot (copilot.microsoft.com)  
-✅ **Z.ai (chat.z.ai)** ← NEW!    
+✅ Microsoft 365 Copilot (m365.cloud.microsoft)  
+✅ Microsoft Teams (teams.cloud.microsoft) -- meeting transcripts with speaker names  
+✅ Z.ai (chat.z.ai)  
+✅ Qwen (qwencloud.com)  
 ✅ WhatsApp Web (web.whatsapp.com) (auto-scrolls to capture all)
 
 ## Version History
