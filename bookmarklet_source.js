@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen
-// Version: 3.6.0
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams
+// Version: 3.7.0
 
 (() => {
-  const VERSION = "3.6.0";
+  const VERSION = "3.7.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -904,8 +904,179 @@
       }
     })();
     return; // Exit early - async handler will complete the download
+  } else if (hostname.includes("teams.cloud.microsoft")) {
+    siteName = "Microsoft Teams";
+    // Teams meeting transcript extraction via SharePoint API.
+    // The transcript lives inside a cross-origin SharePoint iframe, so we:
+    //   1. Walk the React fiber tree of the xplatIframe to find the SharePoint embed URL
+    //   2. Parse the SharePoint host, personal-site path, and recording uniqueId from that URL
+    //   3. Use the MSAL-cached SharePoint access token from localStorage
+    //   4. Call the SharePoint v2.1 media/transcripts API for the JSON transcript (includes speaker names)
+    //   5. Format entries into markdown with speaker attribution and timestamps
+    (async () => {
+      try {
+        const teams_xplat_iframe_element = document.getElementById("xplatIframe");
+        if (!teams_xplat_iframe_element) {
+          alert("No meeting recap found.\n\nPlease open a meeting with a recording/transcript, then run the bookmarklet again.");
+          return;
+        }
+
+        // Walk React fiber tree to find the xPlatUrl prop
+        const teams_react_fiber_key = Object.keys(teams_xplat_iframe_element).find(k => k.startsWith("__reactFiber") || k.startsWith("__reactInternalInstance"));
+        let teams_xplat_embed_url = "";
+        if (teams_react_fiber_key) {
+          let teams_fiber_node = teams_xplat_iframe_element[teams_react_fiber_key];
+          for (let teams_fiber_depth = 0; teams_fiber_depth < 15 && teams_fiber_node; teams_fiber_depth++) {
+            if (teams_fiber_node.memoizedProps?.xPlatUrl) {
+              teams_xplat_embed_url = teams_fiber_node.memoizedProps.xPlatUrl;
+              break;
+            }
+            teams_fiber_node = teams_fiber_node.return;
+          }
+        }
+        if (!teams_xplat_embed_url) {
+          alert("Could not find meeting recording URL.\n\nMake sure you are viewing a meeting recap with a transcript.");
+          return;
+        }
+
+        console.log(`[Bookmarklet v${VERSION}] Teams: found xPlatUrl, extracting transcript via SharePoint API`);
+
+        // Parse SharePoint host, personal-site path, and uniqueId from the embed URL
+        const teams_embed_url_parsed = new URL(teams_xplat_embed_url);
+        const teams_sharepoint_origin = teams_embed_url_parsed.origin;
+        const teams_personal_site_path_match = teams_embed_url_parsed.pathname.match(/^(\/personal\/[^/]+)/);
+        const teams_personal_site_path = teams_personal_site_path_match ? teams_personal_site_path_match[1] : "";
+        const teams_recording_unique_id = teams_embed_url_parsed.searchParams.get("uniqueId");
+
+        if (!teams_recording_unique_id || !teams_personal_site_path) {
+          alert("Could not parse meeting recording details from the embed URL.");
+          return;
+        }
+
+        // Find the MSAL-cached access token for this SharePoint host
+        const teams_sharepoint_hostname_prefix = teams_embed_url_parsed.hostname.split(".")[0];
+        const teams_msal_token_key = Object.keys(localStorage).find(k =>
+          k.includes("accesstoken") && k.includes(teams_sharepoint_hostname_prefix + ".sharepoint.com")
+        );
+        if (!teams_msal_token_key) {
+          alert("No SharePoint authentication token found.\n\nPlease make sure you are signed in to Microsoft Teams.");
+          return;
+        }
+        let teams_sharepoint_access_token = "";
+        try {
+          teams_sharepoint_access_token = JSON.parse(localStorage.getItem(teams_msal_token_key)).secret;
+        } catch (teams_token_parse_error) {
+          alert("Failed to read SharePoint authentication token.");
+          return;
+        }
+        if (!teams_sharepoint_access_token) {
+          alert("SharePoint authentication token is empty or expired.\n\nTry refreshing the Teams page and running again.");
+          return;
+        }
+
+        const teams_sp_auth_headers = { "Authorization": "Bearer " + teams_sharepoint_access_token };
+
+        // Step 1: Look up the drive ID from the personal site
+        const teams_drive_info_response = await fetch(
+          teams_sharepoint_origin + teams_personal_site_path + "/_api/v2.1/drive?$select=id",
+          { headers: teams_sp_auth_headers, mode: "cors" }
+        );
+        if (!teams_drive_info_response.ok) {
+          throw new Error("Drive lookup failed: " + teams_drive_info_response.status);
+        }
+        const teams_drive_info_data = await teams_drive_info_response.json();
+        const teams_drive_id = teams_drive_info_data.id;
+
+        // Step 2: List available transcripts for this recording
+        const teams_transcript_list_response = await fetch(
+          teams_sharepoint_origin + "/_api/v2.1/drives/" + teams_drive_id + "/items/" + teams_recording_unique_id + "/media/transcripts",
+          { headers: teams_sp_auth_headers, mode: "cors" }
+        );
+        if (!teams_transcript_list_response.ok) {
+          throw new Error("Transcript list failed: " + teams_transcript_list_response.status);
+        }
+        const teams_transcript_list_data = await teams_transcript_list_response.json();
+        const teams_first_transcript = teams_transcript_list_data.value?.[0];
+        if (!teams_first_transcript) {
+          alert("No transcript found for this meeting recording.");
+          return;
+        }
+
+        // Step 3: Download the transcript JSON (includes speaker names and timestamps)
+        const teams_transcript_content_response = await fetch(
+          teams_sharepoint_origin + "/_api/v2.1/drives/" + teams_drive_id + "/items/" + teams_recording_unique_id + "/media/transcripts/" + teams_first_transcript.id + "/content?format=json",
+          { headers: teams_sp_auth_headers, mode: "cors" }
+        );
+        if (!teams_transcript_content_response.ok) {
+          throw new Error("Transcript content failed: " + teams_transcript_content_response.status);
+        }
+        const teams_transcript_json_data = await teams_transcript_content_response.json();
+        const teams_transcript_entries = teams_transcript_json_data.entries || [];
+
+        if (teams_transcript_entries.length === 0) {
+          alert("Transcript is empty.");
+          return;
+        }
+
+        console.log(`[Bookmarklet v${VERSION}] Teams: got ${teams_transcript_entries.length} transcript entries from ${[...new Set(teams_transcript_entries.map(e => e.speakerDisplayName))].length} speakers`);
+
+        // Step 4: Format entries into markdown, grouping consecutive same-speaker lines
+        let teams_current_speaker_name = "";
+        let teams_current_speaker_start_time = "";
+        let teams_current_speaker_text_lines = [];
+        const teams_format_time_from_offset = (offset_string) => {
+          // Convert "00:41:47.8250158" to "41:47"
+          const teams_time_parts = offset_string.split(":");
+          const teams_hours = parseInt(teams_time_parts[0], 10);
+          const teams_minutes = parseInt(teams_time_parts[1], 10);
+          const teams_seconds = parseInt(teams_time_parts[2], 10);
+          if (teams_hours > 0) {
+            return teams_hours + ":" + String(teams_minutes).padStart(2, "0") + ":" + String(teams_seconds).padStart(2, "0");
+          }
+          return teams_minutes + ":" + String(teams_seconds).padStart(2, "0");
+        };
+        const teams_flush_current_speaker_block = () => {
+          if (teams_current_speaker_text_lines.length > 0) {
+            conversationMarkdown += "---\n### " + teams_current_speaker_name + "\n*" + teams_current_speaker_start_time + "*\n\n" + teams_current_speaker_text_lines.join("\n") + "\n\n";
+          }
+        };
+        for (const teams_single_entry of teams_transcript_entries) {
+          const teams_entry_speaker = teams_single_entry.speakerDisplayName || "Unknown";
+          const teams_entry_text = (teams_single_entry.text || "").trim();
+          if (!teams_entry_text) { continue; }
+          const teams_entry_start_time = teams_format_time_from_offset(teams_single_entry.startOffset || "00:00:00");
+          if (teams_entry_speaker !== teams_current_speaker_name) {
+            teams_flush_current_speaker_block();
+            teams_current_speaker_name = teams_entry_speaker;
+            teams_current_speaker_start_time = teams_entry_start_time;
+            teams_current_speaker_text_lines = [teams_entry_text];
+          } else {
+            teams_current_speaker_text_lines.push(teams_entry_text);
+          }
+        }
+        teams_flush_current_speaker_block();
+
+        if (!conversationMarkdown) {
+          alert("No transcript content extracted.");
+          return;
+        }
+
+        filename = document.title.replace(/^\(\d+\)\s*/, "").replace(/\s*\|\s*Microsoft Teams$/, "").replace(/^Chat\s*\|\s*/, "").replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "teams_transcript";
+        const fullMarkdown = `[${siteName}](${url})\n\n${conversationMarkdown}`;
+        const blob = new Blob([fullMarkdown], { type: "text/markdown" });
+        const downloadLink = document.createElement("a");
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = `${filename}.md`;
+        downloadLink.click();
+        console.log(`[Bookmarklet v${VERSION}] Teams: downloaded ${teams_transcript_entries.length} entries as ${filename}.md`);
+      } catch (teams_extraction_error) {
+        console.error(`[Bookmarklet v${VERSION}] Teams extraction failed:`, teams_extraction_error);
+        alert("Failed to extract Teams transcript:\n" + teams_extraction_error.message + "\n\nCheck browser console for details.");
+      }
+    })();
+    return;
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams");
     return;
   }
 
