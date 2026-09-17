@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
 // Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen
-// Version: 3.5.0
+// Version: 3.6.0
 
 (() => {
-  const VERSION = "3.5.0";
+  const VERSION = "3.6.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -16,109 +16,181 @@
 
   if (hostname.includes("chatgpt.com")) {
     siteName = "ChatGPT";
+    // Three extraction strategies, tried in order:
+    //   1. Backend API (full conversation from server, handles any length)
+    //   2. React fiber tree (client-side state, no network, good fallback)
+    //   3. DOM scraping (visible messages only, last resort)
+    const chatgpt_conversation_id_from_url = window.location.pathname.match(/\/c\/([a-f0-9-]+)/)?.[1];
+    if (chatgpt_conversation_id_from_url) {
+      (async () => {
+        let chatgpt_extraction_method_that_succeeded = "";
 
-    let chatgpt_react_tree_extraction_succeeded = false;
-    try {
-      const chatgpt_any_message_element = document.querySelector("[data-message-id]");
-      if (chatgpt_any_message_element) {
-        const chatgpt_react_fiber_key = Object.keys(chatgpt_any_message_element).find(k => k.startsWith("__reactFiber"));
-        if (chatgpt_react_fiber_key) {
-          let chatgpt_fiber_walker = chatgpt_any_message_element[chatgpt_react_fiber_key];
-          let chatgpt_conversation_object = null;
-          for (let chatgpt_depth = 0; chatgpt_depth < 15 && chatgpt_fiber_walker; chatgpt_depth++) {
-            if (chatgpt_fiber_walker.memoizedProps?.conversation) {
-              chatgpt_conversation_object = chatgpt_fiber_walker.memoizedProps.conversation;
-              break;
-            }
-            chatgpt_fiber_walker = chatgpt_fiber_walker.return;
-          }
-          if (chatgpt_conversation_object) {
-            const chatgpt_symbol_properties = Object.getOwnPropertySymbols(chatgpt_conversation_object);
-            let chatgpt_conversation_tree = null;
-            for (const chatgpt_sym of chatgpt_symbol_properties) {
-              try {
-                const chatgpt_signal_value = chatgpt_conversation_object[chatgpt_sym];
-                const chatgpt_resolved_value = typeof chatgpt_signal_value === "function" ? chatgpt_signal_value() : chatgpt_signal_value;
-                if (chatgpt_resolved_value && typeof chatgpt_resolved_value === "object" && chatgpt_resolved_value.tree && chatgpt_resolved_value.tree.nodes) {
-                  chatgpt_conversation_tree = chatgpt_resolved_value.tree;
-                  break;
+        // Strategy 1: Backend API -- fetches the full conversation tree from the server,
+        // including messages the lazy-loading UI never rendered.
+        try {
+          const chatgpt_session_response = await fetch("/api/auth/session", { credentials: "include" });
+          if (!chatgpt_session_response.ok) { throw new Error("Session fetch returned " + chatgpt_session_response.status); }
+          const chatgpt_session_data = await chatgpt_session_response.json();
+          if (!chatgpt_session_data.accessToken) { throw new Error("No accessToken in session"); }
+
+          const chatgpt_api_conversation_response = await fetch(
+            "/backend-api/conversation/" + chatgpt_conversation_id_from_url,
+            { credentials: "include", headers: { "Authorization": "Bearer " + chatgpt_session_data.accessToken } }
+          );
+          if (!chatgpt_api_conversation_response.ok) { throw new Error("Conversation API returned " + chatgpt_api_conversation_response.status); }
+          const chatgpt_api_conversation_data = await chatgpt_api_conversation_response.json();
+
+          const chatgpt_api_node_mapping = chatgpt_api_conversation_data.mapping;
+          const chatgpt_api_ordered_messages = [];
+          let chatgpt_api_current_node_id = chatgpt_api_conversation_data.current_node;
+          let chatgpt_api_walk_counter = 0;
+          while (chatgpt_api_current_node_id && chatgpt_api_walk_counter < 10000) {
+            const chatgpt_api_current_node = chatgpt_api_node_mapping[chatgpt_api_current_node_id];
+            if (!chatgpt_api_current_node) { break; }
+            const chatgpt_api_node_message = chatgpt_api_current_node.message;
+            if (chatgpt_api_node_message && chatgpt_api_node_message.author) {
+              const chatgpt_api_author_role = chatgpt_api_node_message.author.role;
+              const chatgpt_api_content_type = chatgpt_api_node_message.content?.content_type;
+              if ((chatgpt_api_author_role === "user" || chatgpt_api_author_role === "assistant") && (chatgpt_api_content_type === "text" || chatgpt_api_content_type === "multimodal_text")) {
+                const chatgpt_api_content_parts = chatgpt_api_node_message.content?.parts || [];
+                const chatgpt_api_text_parts = chatgpt_api_content_parts.filter(p => typeof p === "string");
+                const chatgpt_api_joined_text = chatgpt_api_text_parts.join("\n");
+                if (chatgpt_api_joined_text.length > 0) {
+                  chatgpt_api_ordered_messages.unshift({ role: chatgpt_api_author_role, text: chatgpt_api_joined_text });
                 }
-              } catch (chatgpt_signal_error) {}
-            }
-            if (chatgpt_conversation_tree) {
-              const chatgpt_all_nodes = chatgpt_conversation_tree.nodes;
-              const chatgpt_leaf_id = chatgpt_conversation_tree.currentLeafId;
-              const chatgpt_node_uuid_to_index = {};
-              for (const chatgpt_idx of Object.keys(chatgpt_all_nodes)) {
-                chatgpt_node_uuid_to_index[chatgpt_all_nodes[chatgpt_idx].id] = chatgpt_idx;
               }
-              const chatgpt_ordered_branch_messages = [];
-              let chatgpt_current_node_index = chatgpt_node_uuid_to_index[chatgpt_leaf_id];
-              let chatgpt_traversal_safety_counter = 0;
-              while (chatgpt_current_node_index !== undefined && chatgpt_traversal_safety_counter < 500) {
-                const chatgpt_current_node = chatgpt_all_nodes[chatgpt_current_node_index];
-                if (!chatgpt_current_node) { break; }
-                const chatgpt_node_message = chatgpt_current_node.message;
-                if (chatgpt_node_message && chatgpt_node_message.author) {
-                  const chatgpt_author_role = chatgpt_node_message.author.role;
-                  const chatgpt_content_type = chatgpt_node_message.content?.content_type;
-                  if ((chatgpt_author_role === "user" || chatgpt_author_role === "assistant") && chatgpt_content_type === "text") {
-                    const chatgpt_content_parts = chatgpt_node_message.content?.parts || [];
-                    const chatgpt_text_only_parts = chatgpt_content_parts.filter(p => typeof p === "string");
-                    const chatgpt_joined_text = chatgpt_text_only_parts.join("\n");
-                    if (chatgpt_joined_text.length > 0) {
-                      chatgpt_ordered_branch_messages.unshift({
-                        role: chatgpt_author_role,
-                        text: chatgpt_joined_text
-                      });
+            }
+            chatgpt_api_current_node_id = chatgpt_api_current_node.parent;
+            chatgpt_api_walk_counter++;
+          }
+          if (chatgpt_api_ordered_messages.length > 0) {
+            chatgpt_extraction_method_that_succeeded = "api";
+            for (const chatgpt_api_msg of chatgpt_api_ordered_messages) {
+              const chatgpt_api_role_header = chatgpt_api_msg.role === "user" ? "### User" : "### Assistant";
+              conversationMarkdown += `---\n${chatgpt_api_role_header}\n\n${chatgpt_api_msg.text}\n\n`;
+            }
+            console.log(`[Bookmarklet v${VERSION}] ChatGPT: extracted ${chatgpt_api_ordered_messages.length} messages from backend API`);
+          }
+        } catch (chatgpt_api_extraction_error) {
+          console.log(`[Bookmarklet v${VERSION}] ChatGPT API extraction failed: ${chatgpt_api_extraction_error.message}, trying React tree`);
+        }
+
+        // Strategy 2: React fiber tree -- walks the client-side conversation state.
+        if (!chatgpt_extraction_method_that_succeeded) {
+          try {
+            const chatgpt_any_message_element = document.querySelector("[data-message-id]");
+            if (chatgpt_any_message_element) {
+              const chatgpt_react_fiber_key = Object.keys(chatgpt_any_message_element).find(k => k.startsWith("__reactFiber"));
+              if (chatgpt_react_fiber_key) {
+                let chatgpt_fiber_walker = chatgpt_any_message_element[chatgpt_react_fiber_key];
+                let chatgpt_conversation_object = null;
+                for (let chatgpt_depth = 0; chatgpt_depth < 15 && chatgpt_fiber_walker; chatgpt_depth++) {
+                  if (chatgpt_fiber_walker.memoizedProps?.conversation) {
+                    chatgpt_conversation_object = chatgpt_fiber_walker.memoizedProps.conversation;
+                    break;
+                  }
+                  chatgpt_fiber_walker = chatgpt_fiber_walker.return;
+                }
+                if (chatgpt_conversation_object) {
+                  const chatgpt_symbol_properties = Object.getOwnPropertySymbols(chatgpt_conversation_object);
+                  let chatgpt_conversation_tree = null;
+                  for (const chatgpt_sym of chatgpt_symbol_properties) {
+                    try {
+                      const chatgpt_signal_value = chatgpt_conversation_object[chatgpt_sym];
+                      const chatgpt_resolved_value = typeof chatgpt_signal_value === "function" ? chatgpt_signal_value() : chatgpt_signal_value;
+                      if (chatgpt_resolved_value && typeof chatgpt_resolved_value === "object" && chatgpt_resolved_value.tree && chatgpt_resolved_value.tree.nodes) {
+                        chatgpt_conversation_tree = chatgpt_resolved_value.tree;
+                        break;
+                      }
+                    } catch (chatgpt_signal_error) {}
+                  }
+                  if (chatgpt_conversation_tree) {
+                    const chatgpt_all_nodes = chatgpt_conversation_tree.nodes;
+                    const chatgpt_leaf_id = chatgpt_conversation_tree.currentLeafId;
+                    const chatgpt_node_uuid_to_index = {};
+                    for (const chatgpt_idx of Object.keys(chatgpt_all_nodes)) {
+                      chatgpt_node_uuid_to_index[chatgpt_all_nodes[chatgpt_idx].id] = chatgpt_idx;
+                    }
+                    const chatgpt_ordered_branch_messages = [];
+                    let chatgpt_current_node_index = chatgpt_node_uuid_to_index[chatgpt_leaf_id];
+                    let chatgpt_traversal_safety_counter = 0;
+                    while (chatgpt_current_node_index !== undefined && chatgpt_traversal_safety_counter < 10000) {
+                      const chatgpt_current_node = chatgpt_all_nodes[chatgpt_current_node_index];
+                      if (!chatgpt_current_node) { break; }
+                      const chatgpt_node_message = chatgpt_current_node.message;
+                      if (chatgpt_node_message && chatgpt_node_message.author) {
+                        const chatgpt_author_role = chatgpt_node_message.author.role;
+                        const chatgpt_content_type = chatgpt_node_message.content?.content_type;
+                        if ((chatgpt_author_role === "user" || chatgpt_author_role === "assistant") && (chatgpt_content_type === "text" || chatgpt_content_type === "multimodal_text")) {
+                          const chatgpt_content_parts = chatgpt_node_message.content?.parts || [];
+                          const chatgpt_text_only_parts = chatgpt_content_parts.filter(p => typeof p === "string");
+                          const chatgpt_joined_text = chatgpt_text_only_parts.join("\n");
+                          if (chatgpt_joined_text.length > 0) {
+                            chatgpt_ordered_branch_messages.unshift({ role: chatgpt_author_role, text: chatgpt_joined_text });
+                          }
+                        }
+                      }
+                      const chatgpt_parent_uuid = chatgpt_current_node.parentId;
+                      chatgpt_current_node_index = chatgpt_parent_uuid ? chatgpt_node_uuid_to_index[chatgpt_parent_uuid] : undefined;
+                      chatgpt_traversal_safety_counter++;
+                    }
+                    if (chatgpt_ordered_branch_messages.length > 0) {
+                      chatgpt_extraction_method_that_succeeded = "react_tree";
+                      for (const chatgpt_msg of chatgpt_ordered_branch_messages) {
+                        const chatgpt_role_header = chatgpt_msg.role === "user" ? "### User" : "### Assistant";
+                        conversationMarkdown += `---\n${chatgpt_role_header}\n\n${chatgpt_msg.text}\n\n`;
+                      }
+                      console.log(`[Bookmarklet v${VERSION}] ChatGPT: extracted ${chatgpt_ordered_branch_messages.length} messages from React state tree`);
                     }
                   }
                 }
-                const chatgpt_parent_uuid = chatgpt_current_node.parentId;
-                chatgpt_current_node_index = chatgpt_parent_uuid ? chatgpt_node_uuid_to_index[chatgpt_parent_uuid] : undefined;
-                chatgpt_traversal_safety_counter++;
-              }
-              if (chatgpt_ordered_branch_messages.length > 0) {
-                chatgpt_react_tree_extraction_succeeded = true;
-                for (const chatgpt_msg of chatgpt_ordered_branch_messages) {
-                  const chatgpt_role_header = chatgpt_msg.role === "user" ? "### User" : "### Assistant";
-                  conversationMarkdown += `---\n${chatgpt_role_header}\n\n${chatgpt_msg.text}\n\n`;
-                }
-                console.log(`[Bookmarklet v${VERSION}] ChatGPT: extracted ${chatgpt_ordered_branch_messages.length} messages from React state tree`);
               }
             }
+          } catch (chatgpt_react_extraction_error) {
+            console.log(`[Bookmarklet v${VERSION}] ChatGPT React tree extraction failed: ${chatgpt_react_extraction_error.message}, falling back to DOM`);
           }
         }
-      }
-    } catch (chatgpt_react_extraction_error) {
-      console.log(`[Bookmarklet v${VERSION}] ChatGPT React tree extraction failed: ${chatgpt_react_extraction_error.message}, falling back to DOM`);
-    }
 
-    if (!chatgpt_react_tree_extraction_succeeded) {
-      console.log(`[Bookmarklet v${VERSION}] ChatGPT: falling back to DOM scraping`);
-      const chatgpt_dom_message_elements = document.querySelectorAll("div[data-message-author-role]");
-      const chatgpt_dom_message_array = Array.from(chatgpt_dom_message_elements);
-
-      for (let i = 0; i < chatgpt_dom_message_array.length; i++) {
-        const chatgpt_dom_current_message = chatgpt_dom_message_array[i];
-        const chatgpt_dom_current_role = chatgpt_dom_current_message.getAttribute("data-message-author-role");
-
-        if (chatgpt_dom_current_role === "user") {
-          const chatgpt_dom_pre_wrap_element = chatgpt_dom_current_message.querySelector(".whitespace-pre-wrap");
-          const chatgpt_dom_user_text = chatgpt_dom_pre_wrap_element
-            ? (chatgpt_dom_pre_wrap_element.innerText || chatgpt_dom_pre_wrap_element.textContent || "").trim()
-            : (chatgpt_dom_current_message.textContent || "").trim();
-          if (chatgpt_dom_user_text) {
-            conversationMarkdown += `---\n### User\n\n${chatgpt_dom_user_text}\n\n`;
+        // Strategy 3: DOM scraping -- captures only what is currently visible in the viewport.
+        if (!chatgpt_extraction_method_that_succeeded) {
+          console.log(`[Bookmarklet v${VERSION}] ChatGPT: falling back to DOM scraping`);
+          const chatgpt_dom_message_elements = document.querySelectorAll("div[data-message-author-role]");
+          const chatgpt_dom_message_array = Array.from(chatgpt_dom_message_elements);
+          for (let i = 0; i < chatgpt_dom_message_array.length; i++) {
+            const chatgpt_dom_current_message = chatgpt_dom_message_array[i];
+            const chatgpt_dom_current_role = chatgpt_dom_current_message.getAttribute("data-message-author-role");
+            if (chatgpt_dom_current_role === "user") {
+              const chatgpt_dom_pre_wrap_element = chatgpt_dom_current_message.querySelector(".whitespace-pre-wrap");
+              const chatgpt_dom_user_text = chatgpt_dom_pre_wrap_element
+                ? (chatgpt_dom_pre_wrap_element.innerText || chatgpt_dom_pre_wrap_element.textContent || "").trim()
+                : (chatgpt_dom_current_message.textContent || "").trim();
+              if (chatgpt_dom_user_text) { conversationMarkdown += `---\n### User\n\n${chatgpt_dom_user_text}\n\n`; }
+            } else if (chatgpt_dom_current_role === "assistant") {
+              const chatgpt_dom_assistant_text = (chatgpt_dom_current_message.textContent || "").trim();
+              if (chatgpt_dom_assistant_text) { conversationMarkdown += `### Assistant\n\n${chatgpt_dom_assistant_text}\n\n`; }
+            }
           }
-        } else if (chatgpt_dom_current_role === "assistant") {
-          const chatgpt_dom_assistant_text = (chatgpt_dom_current_message.textContent || "").trim();
-          if (chatgpt_dom_assistant_text) {
-            conversationMarkdown += `### Assistant\n\n${chatgpt_dom_assistant_text}\n\n`;
-          }
+          if (conversationMarkdown) { chatgpt_extraction_method_that_succeeded = "dom"; }
         }
-      }
+
+        if (!conversationMarkdown) {
+          console.log(`[Bookmarklet v${VERSION}] ERROR: No conversation content extracted from ChatGPT`);
+          alert(`No conversation found to export\n\nBookmarklet v${VERSION}\nSite: ChatGPT\nAll 3 extraction strategies failed.\nCheck browser console for details.`);
+          return;
+        }
+
+        filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+        const fullMarkdown = `[${siteName}](${url})\n\n${conversationMarkdown}`;
+        const blob = new Blob([fullMarkdown], { type: "text/markdown" });
+        const downloadLink = document.createElement("a");
+        downloadLink.href = URL.createObjectURL(blob);
+        downloadLink.download = `${filename || "chat_export"}.md`;
+        downloadLink.click();
+        console.log(`[Bookmarklet v${VERSION}] Download triggered: ${filename || "chat_export"}.md (method: ${chatgpt_extraction_method_that_succeeded})`);
+      })();
+      return; // Exit early -- async handler completes the download
     }
+    // Fallback for non-conversation ChatGPT pages (e.g. chatgpt.com/ with no /c/ path)
     filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
   } else if (hostname.includes("perplexity.ai")) {
     siteName = "Perplexity";
