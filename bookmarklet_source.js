@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai, Qwen
-// Version: 3.4.0
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen
+// Version: 3.5.0
 
 (() => {
-  const VERSION = "3.4.0";
+  const VERSION = "3.5.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -575,6 +575,48 @@
     });
     
     filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "copilot_chat";
+  } else if (hostname.includes("m365.cloud.microsoft")) {
+    siteName = "Microsoft 365 Copilot";
+    // M365 Copilot (BizChat) uses Fluent AI components with a virtualizer.
+    // Each conversation turn is a div[data-virtualizer-index] containing a
+    // .fai-UserMessage article and a .fai-CopilotMessage article.
+    const m365_feed_container = document.querySelector('[role="feed"]');
+    if (m365_feed_container) {
+      const m365_virtualized_turn_elements = m365_feed_container.querySelectorAll('[data-virtualizer-index]');
+      m365_virtualized_turn_elements.forEach((m365_single_turn_element, m365_turn_index) => {
+        // Extract user message from the dedicated message div
+        const m365_user_message_content_div = m365_single_turn_element.querySelector('.fai-UserMessage .fai-UserMessage__message');
+        if (m365_user_message_content_div) {
+          const m365_user_visible_text = m365_user_message_content_div.innerText.trim();
+          if (m365_user_visible_text) {
+            conversationMarkdown += `---\n### User\n\n${m365_user_visible_text}\n\n`;
+            if (m365_turn_index === 0) {
+              filename = m365_user_visible_text.substring(0, 60);
+            }
+          }
+        }
+        // Extract copilot response from the content div, excluding toolbar/actions
+        const m365_copilot_message_article = m365_single_turn_element.querySelector('.fai-CopilotMessage');
+        if (m365_copilot_message_article) {
+          const m365_copilot_content_div = m365_copilot_message_article.querySelector('.fai-CopilotMessage__content');
+          if (m365_copilot_content_div) {
+            // Clone and strip non-content elements for clean text extraction
+            const m365_content_clone_for_text_extraction = m365_copilot_content_div.cloneNode(true);
+            // Remove reasoning chain-of-thought toggle ("Reasoning completed in N steps")
+            const m365_reasoning_chain_of_thought_block = m365_content_clone_for_text_extraction.querySelector('.scc-ChainOfThought');
+            if (m365_reasoning_chain_of_thought_block) { m365_reasoning_chain_of_thought_block.remove(); }
+            // Remove citation buttons (they duplicate link text already in the response)
+            const m365_citation_and_action_buttons = m365_content_clone_for_text_extraction.querySelectorAll('button');
+            m365_citation_and_action_buttons.forEach(m365_btn => m365_btn.remove());
+            const m365_copilot_response_text = m365_content_clone_for_text_extraction.innerText.trim();
+            if (m365_copilot_response_text) {
+              conversationMarkdown += `### Assistant\n\n${m365_copilot_response_text}\n\n`;
+            }
+          }
+        }
+      });
+    }
+    filename = (filename || document.title).replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "m365_copilot_chat";
   } else if (hostname === "z.ai" || hostname.endsWith(".z.ai")) {
     siteName = "Z.ai";
     // Z.ai runs an Open WebUI-based frontend: user turns carry class "chat-user" and
@@ -791,7 +833,7 @@
     })();
     return; // Exit early - async handler will complete the download
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, WhatsApp, Z.ai, Qwen");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen");
     return;
   }
 

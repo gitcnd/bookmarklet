@@ -21,7 +21,8 @@ A browser bookmarklet to save AI chat conversations as Markdown files.
 - **X / Twitter** (x.com)
 - **Grok** (grok.com + x.com/i/grok)
 - **Microsoft Copilot** (copilot.microsoft.com)
-- **Z.ai** (chat.z.ai, GLM models) ✨ NEW!
+- **Microsoft 365 Copilot** (m365.cloud.microsoft) ✨ NEW!
+- **Z.ai** (chat.z.ai, GLM models)
 - **WhatsApp Web** (web.whatsapp.com)
   - ⚠️ **Scroll to top manually first**, then scroll down/up to verify
   - Captures all messages as it scrolls back down
