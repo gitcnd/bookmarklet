@@ -1,9 +1,9 @@
 // Bookmarklet to export AI chat conversations to Markdown
-// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams
-// Version: 3.7.0
+// Supports: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams, Slack Threads
+// Version: 3.8.0
 
 (() => {
-  const VERSION = "3.7.0";
+  const VERSION = "3.8.0";
   console.log(`[Bookmarklet v${VERSION}] Starting extraction...`);
   
   const hostname = window.location.hostname;
@@ -190,7 +190,28 @@
       })();
       return; // Exit early -- async handler completes the download
     }
-    // Fallback for non-conversation ChatGPT pages (e.g. chatgpt.com/ with no /c/ path)
+    // Fallback for ChatGPT pages without a /c/ path (e.g. temporary chats at /?temporary-chat=true).
+    // The 3-strategy async block above only runs when a conversation ID is in the URL, but
+    // temporary chats have messages in the DOM despite having no /c/ path.  Scrape them here.
+    const chatgpt_temp_chat_dom_elements = document.querySelectorAll("div[data-message-author-role]");
+    const chatgpt_temp_chat_dom_array = Array.from(chatgpt_temp_chat_dom_elements);
+    for (let chatgpt_temp_index = 0; chatgpt_temp_index < chatgpt_temp_chat_dom_array.length; chatgpt_temp_index++) {
+      const chatgpt_temp_current_message = chatgpt_temp_chat_dom_array[chatgpt_temp_index];
+      const chatgpt_temp_current_role = chatgpt_temp_current_message.getAttribute("data-message-author-role");
+      if (chatgpt_temp_current_role === "user") {
+        const chatgpt_temp_pre_wrap_element = chatgpt_temp_current_message.querySelector(".whitespace-pre-wrap");
+        const chatgpt_temp_user_text = chatgpt_temp_pre_wrap_element
+          ? (chatgpt_temp_pre_wrap_element.innerText || chatgpt_temp_pre_wrap_element.textContent || "").trim()
+          : (chatgpt_temp_current_message.textContent || "").trim();
+        if (chatgpt_temp_user_text) { conversationMarkdown += `---\n### User\n\n${chatgpt_temp_user_text}\n\n`; }
+      } else if (chatgpt_temp_current_role === "assistant") {
+        const chatgpt_temp_assistant_text = (chatgpt_temp_current_message.textContent || "").trim();
+        if (chatgpt_temp_assistant_text) { conversationMarkdown += `### Assistant\n\n${chatgpt_temp_assistant_text}\n\n`; }
+      }
+    }
+    if (conversationMarkdown) {
+      console.log(`[Bookmarklet v${VERSION}] ChatGPT: extracted ${chatgpt_temp_chat_dom_array.length} messages via DOM (no /c/ path, likely temporary chat)`);
+    }
     filename = document.title.replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
   } else if (hostname.includes("perplexity.ai")) {
     siteName = "Perplexity";
@@ -1075,8 +1096,76 @@
       }
     })();
     return;
+  } else if (hostname.includes("app.slack.com")) {
+    siteName = "Slack Thread";
+    // Extracts messages from the thread panel (flexpane) visible on the right side of the Slack UI.
+    // The thread panel uses class .p-flexpane--iap1 and contains [data-qa="message_container"] elements.
+    // Slack groups consecutive messages from the same sender, showing the sender name only on the first
+    // message in each group, so we carry the last known sender forward for messages without one.
+    const slack_thread_panel_flexpane_element = document.querySelector('.p-flexpane--iap1');
+    if (!slack_thread_panel_flexpane_element) {
+      alert("No Slack thread panel found.\n\nPlease open a thread in the right-side panel first, then run the bookmarklet again.");
+      return;
+    }
+    const slack_thread_message_container_elements = slack_thread_panel_flexpane_element.querySelectorAll('[data-qa="message_container"]');
+    if (slack_thread_message_container_elements.length === 0) {
+      alert("Thread panel is open but contains no messages.");
+      return;
+    }
+    console.log(`[Bookmarklet v${VERSION}] Slack: found ${slack_thread_message_container_elements.length} messages in thread panel`);
+    let slack_last_known_sender_name = "";
+    for (const slack_single_message_element of slack_thread_message_container_elements) {
+      const slack_sender_display_element = slack_single_message_element.querySelector('[data-qa="message_sender"]');
+      const slack_sender_display_text = slack_sender_display_element?.textContent?.trim() || "";
+      if (slack_sender_display_text) { slack_last_known_sender_name = slack_sender_display_text; }
+      const slack_effective_sender_for_this_message = slack_sender_display_text || slack_last_known_sender_name || "Unknown";
+
+      const slack_timestamp_element = slack_single_message_element.querySelector('[class*="c-timestamp"]');
+      let slack_message_timestamp_text = slack_timestamp_element?.getAttribute("aria-label") || slack_timestamp_element?.textContent?.trim() || "";
+      // Strip ". Open in channel" suffix that Slack appends to thread-message timestamps
+      slack_message_timestamp_text = slack_message_timestamp_text.replace(/\.\s*Open in channel$/i, "").trim();
+
+      // Extract message body, preserving code blocks as markdown fenced blocks
+      const slack_message_body_blocks_element = slack_single_message_element.querySelector('[class*="c-message_kit__blocks"]');
+      if (!slack_message_body_blocks_element) { continue; }
+
+      const slack_body_clone_for_text_extraction = slack_message_body_blocks_element.cloneNode(true);
+      const slack_code_block_pre_elements_in_clone = slack_body_clone_for_text_extraction.querySelectorAll('pre');
+      for (const slack_pre_element of slack_code_block_pre_elements_in_clone) {
+        const slack_code_raw_text = slack_pre_element.textContent || "";
+        // Replace the <pre> with a text node containing markdown fenced code
+        const slack_fenced_code_replacement = document.createTextNode("\n```\n" + slack_code_raw_text + "\n```\n");
+        slack_pre_element.replaceWith(slack_fenced_code_replacement);
+      }
+      let slack_assembled_message_text = (slack_body_clone_for_text_extraction.innerText || "").trim();
+      if (!slack_assembled_message_text) { continue; }
+
+      // Append file attachment names if present
+      const slack_file_name_display_elements = slack_single_message_element.querySelectorAll('.c-file_name, [data-qa="file_name"]');
+      if (slack_file_name_display_elements.length > 0) {
+        const slack_unique_attached_file_names = [...new Set(
+          Array.from(slack_file_name_display_elements).map(el => el.textContent?.trim()).filter(Boolean)
+        )];
+        if (slack_unique_attached_file_names.length > 0) {
+          slack_assembled_message_text += "\n\n**Attachments:** " + slack_unique_attached_file_names.join(", ");
+        }
+      }
+
+      conversationMarkdown += "---\n### " + slack_effective_sender_for_this_message + "\n";
+      if (slack_message_timestamp_text) {
+        conversationMarkdown += "*" + slack_message_timestamp_text + "*\n\n";
+      }
+      conversationMarkdown += slack_assembled_message_text + "\n\n";
+    }
+    // Parse channel name from page title: "channel-name (Channel) - WorkspaceName - N new items - Slack"
+    const slack_channel_name_from_page_title = document.title
+      .replace(/\s*-\s*\d+\s*new\s*items?\s*/gi, " ")
+      .match(/^([^(]+)/)?.[1]?.trim() || "";
+    filename = ("slack_thread_" + slack_channel_name_from_page_title)
+      .replace(/[^\w\d\s]+/g, "").replace(/\s+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "slack_thread";
+    console.log(`[Bookmarklet v${VERSION}] Slack: extracted thread from #${slack_channel_name_from_page_title}`);
   } else {
-    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams");
+    alert("Unsupported site. Supported: ChatGPT, Perplexity, DeepSeek, OpenRouter, Claude, Gemini, Google AI Studio, X.com, Grok, Microsoft Copilot, M365 Copilot, WhatsApp, Z.ai, Qwen, Teams, Slack Threads");
     return;
   }
 

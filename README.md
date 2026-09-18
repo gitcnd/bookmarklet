@@ -25,6 +25,7 @@ A browser bookmarklet to save AI chat conversations as Markdown files.
 - **Microsoft Teams** (teams.cloud.microsoft) -- meeting transcripts with speaker names ✨ NEW!
 - **Z.ai** (chat.z.ai, GLM models)
 - **Qwen** (qwencloud.com)
+- **Slack Threads** (app.slack.com) -- thread panel extraction with code blocks and attachments
 - **WhatsApp Web** (web.whatsapp.com)
   - ⚠️ **Scroll to top manually first**, then scroll down/up to verify
   - Captures all messages as it scrolls back down

@@ -37,6 +37,7 @@
 | Microsoft Copilot | copilot.microsoft.com | ✅ Working |
 | Microsoft 365 Copilot | m365.cloud.microsoft | ✅ Working |
 | Microsoft Teams | teams.cloud.microsoft | ✅ Meeting transcripts |
+| Slack Threads | app.slack.com | ✅ Open thread panel first |
 | WhatsApp Web | web.whatsapp.com | ✅ Scroll to top first, then run |
 | Z.ai | chat.z.ai | ✅ Working |
 | Qwen | qwencloud.com | ✅ Working |

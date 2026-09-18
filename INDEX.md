@@ -65,6 +65,7 @@ bookmarklet/
 ✅ Microsoft Teams (teams.cloud.microsoft) -- meeting transcripts with speaker names  
 ✅ Z.ai (chat.z.ai)  
 ✅ Qwen (qwencloud.com)  
+✅ Slack Threads (app.slack.com) -- thread panel with code blocks and attachments  
 ✅ WhatsApp Web (web.whatsapp.com) (auto-scrolls to capture all)
 
 ## Version History
